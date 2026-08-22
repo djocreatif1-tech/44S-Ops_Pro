@@ -117,65 +117,70 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right side actions */}
       <div className="flex items-center gap-1.5 sm:gap-2.5">
-        {/* Notification Config / Bell Button */}
-        {onOpenNotifConfig && (
-          <button
-            onClick={onOpenNotifConfig}
-            className="relative p-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 hover:text-blue-600 hover:bg-slate-100 transition shadow-2xs touch-manipulation"
-            title="Pengaturan Notifikasi Operasional"
-          >
-            <Bell className="w-4 h-4" />
-            {activeNotifCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full text-[9px] flex items-center justify-center font-bold">
-                {activeNotifCount}
-              </span>
+        {/* Owner-only controls: Notification, Sheets Status, Sync, and Deploy Hub */}
+        {effectiveRole === 'owner' && (
+          <>
+            {/* Notification Config / Bell Button */}
+            {onOpenNotifConfig && (
+              <button
+                onClick={onOpenNotifConfig}
+                className="relative p-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 hover:text-blue-600 hover:bg-slate-100 transition shadow-2xs touch-manipulation cursor-pointer"
+                title="Pengaturan Notifikasi Operasional"
+              >
+                <Bell className="w-4 h-4" />
+                {activeNotifCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full text-[9px] flex items-center justify-center font-bold">
+                    {activeNotifCount}
+                  </span>
+                )}
+              </button>
             )}
-          </button>
+
+            {/* Apps Script Connection Status Badge */}
+            <button
+              onClick={onOpenDeployModal}
+              className={`hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition border touch-manipulation cursor-pointer ${
+                isConnected
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100/70'
+                  : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100/70'
+              }`}
+              title="Setup / Buka Google Apps Script (Kode.gs & Index.html)"
+            >
+              {isConnected ? (
+                <>
+                  <CloudCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span className="hidden md:inline font-medium">Sheets</span>
+                </>
+              ) : (
+                <>
+                  <FileCode className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span className="hidden md:inline font-medium">Apps Script</span>
+                </>
+              )}
+            </button>
+
+            {/* Sync Trigger Button */}
+            <button
+              onClick={onTriggerSync}
+              disabled={isSyncing}
+              className="hidden md:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-medium hover:bg-slate-50 active:scale-95 transition shadow-xs touch-manipulation cursor-pointer"
+              title="Sinkronkan dengan Google Spreadsheet"
+            >
+              <RotateCw className={`w-3.5 h-3.5 text-slate-500 ${isSyncing ? 'animate-spin text-blue-600' : ''}`} />
+              <span>{isSyncing ? 'Sync...' : 'Sync'}</span>
+            </button>
+
+            {/* Deploy Hub Modal Button */}
+            <button
+              onClick={onOpenDeployModal}
+              className="hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-blue-600 text-white font-medium text-xs hover:bg-blue-700 active:scale-95 transition shadow-xs touch-manipulation cursor-pointer"
+              title="Buka Deployment Hub"
+            >
+              <PlusCircle className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden sm:inline">Deploy Hub</span>
+            </button>
+          </>
         )}
-
-        {/* Apps Script Connection Status Badge */}
-        <button
-          onClick={onOpenDeployModal}
-          className={`hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition border touch-manipulation ${
-            isConnected
-              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100/70'
-              : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100/70'
-          }`}
-          title="Setup / Buka Google Apps Script (Kode.gs & Index.html)"
-        >
-          {isConnected ? (
-            <>
-              <CloudCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span className="hidden md:inline font-medium">Sheets</span>
-            </>
-          ) : (
-            <>
-              <FileCode className="w-4 h-4 text-blue-600 shrink-0" />
-              <span className="hidden md:inline font-medium">Apps Script</span>
-            </>
-          )}
-        </button>
-
-        {/* Sync Trigger Button */}
-        <button
-          onClick={onTriggerSync}
-          disabled={isSyncing}
-          className="hidden md:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-medium hover:bg-slate-50 active:scale-95 transition shadow-xs touch-manipulation"
-          title="Sinkronkan dengan Google Spreadsheet"
-        >
-          <RotateCw className={`w-3.5 h-3.5 text-slate-500 ${isSyncing ? 'animate-spin text-blue-600' : ''}`} />
-          <span>{isSyncing ? 'Sync...' : 'Sync'}</span>
-        </button>
-
-        {/* Deploy Hub Modal Button */}
-        <button
-          onClick={onOpenDeployModal}
-          className="hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-blue-600 text-white font-medium text-xs hover:bg-blue-700 active:scale-95 transition shadow-xs touch-manipulation cursor-pointer"
-          title="Buka Deployment Hub"
-        >
-          <PlusCircle className="w-3.5 h-3.5 shrink-0" />
-          <span className="hidden sm:inline">Deploy Hub</span>
-        </button>
 
         {/* User Account & Session Profile Dropdown */}
         <div className="relative ml-1">
