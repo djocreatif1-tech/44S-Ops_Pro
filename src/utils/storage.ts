@@ -353,7 +353,7 @@ export const syncToGoogleAppsScript = async (
   const payloadString = JSON.stringify({ action, payload: data, data });
 
   try {
-    // Attempt standard POST
+    // Standard POST with text/plain (avoids CORS preflight in Apps Script)
     const response = await fetch(webAppUrl, {
       method: 'POST',
       headers: {
@@ -366,16 +366,16 @@ export const syncToGoogleAppsScript = async (
       const result = await response.json();
       return {
         success: result.status === 'success' || result.status === 200,
-        message: result.message || 'Data berhasil dikirim ke Google Sheets!'
+        message: result.message || 'Data berhasil disinkronkan ke Google Spreadsheet!'
       };
     } catch {
       return {
         success: true,
-        message: 'Data terkirim ke Google Apps Script.'
+        message: 'Data berhasil terkirim ke Google Apps Script.'
       };
     }
   } catch (err: unknown) {
-    // If blocked by CORS / 302 redirect in browser, send with mode: 'no-cors' to guarantee delivery
+    // If blocked by CORS in browser, fallback to no-cors POST to ensure data reaches Google Apps Script
     try {
       await fetch(webAppUrl, {
         method: 'POST',
@@ -387,7 +387,7 @@ export const syncToGoogleAppsScript = async (
       });
       return {
         success: true,
-        message: 'Data berhasil disinkronkan ke Google Spreadsheet.'
+        message: 'Data berhasil dikirim ke Google Spreadsheet.'
       };
     } catch (fallbackErr: unknown) {
       const errorMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);

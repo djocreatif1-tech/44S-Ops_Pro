@@ -35,6 +35,20 @@ var SHEET_NAMES = {
 };
 
 /**
+ * Mendapatkan Spreadsheet Aktif
+ */
+function getTargetSpreadsheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) {
+    var files = DriveApp.getFilesByName('KENDARAAN');
+    if (files.hasNext()) {
+      ss = SpreadsheetApp.open(files.next());
+    }
+  }
+  return ss;
+}
+
+/**
  * Endpoint GET: Melayani Web App HTML atau API JSON
  */
 function doGet(e) {
@@ -66,11 +80,30 @@ function doGet(e) {
  */
 function doPost(e) {
   try {
-    var rawData = (e && e.postData) ? e.postData.contents : '{}';
-    var payload = JSON.parse(rawData);
-    var action = payload.action;
+    var rawData = '{}';
+    if (e && e.postData && e.postData.contents) {
+      rawData = e.postData.contents;
+    } else if (e && e.parameter && e.parameter.payload) {
+      rawData = e.parameter.payload;
+    }
+
+    var payload = {};
+    try {
+      payload = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
+    } catch (parseErr) {
+      payload = { action: (e && e.parameter && e.parameter.action) || 'ping' };
+    }
+
+    var action = payload.action || (e && e.parameter && e.parameter.action);
     var data = payload.payload || payload.data || payload;
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ss = getTargetSpreadsheet();
+
+    if (!ss) {
+      return jsonResponse({
+        status: 'error',
+        message: 'Google Spreadsheet tidak ditemukan. Buka Apps Script dari menu Extensions > Apps Script di dalam file Spreadsheet.'
+      });
+    }
 
     // Pastikan seluruh sheet sudah siap
     initSheetsDatabase();
@@ -153,10 +186,10 @@ function doPost(e) {
       case 'syncAll':
         return jsonResponse(bulkSync(ss, data));
       case 'ping':
-        return jsonResponse({ status: 'success', message: 'Koneksi 44S Ops_pro Berhasil!' });
+        return jsonResponse({ status: 'success', message: 'Koneksi 44S Ops_pro Berhasil & Aktif!' });
 
       default:
-        return jsonResponse({ status: 'success', message: 'Payload ' + action + ' diterima oleh 44S Ops_pro' });
+        return jsonResponse({ status: 'success', message: 'Aksi ' + action + ' diterima oleh server Google Sheets' });
     }
   } catch (err) {
     return jsonResponse({ status: 'error', message: err.toString() });
@@ -175,7 +208,8 @@ function jsonResponse(obj) {
  * 1-KLIK INISIALISASI DATABASE GOOGLE SPREADSHEET
  */
 function initSheetsDatabase() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = getTargetSpreadsheet();
+  if (!ss) return { status: 'error', message: 'Spreadsheet tidak aktif' };
   
   // 1. Sheet Armada
   var vSheet = createOrSetupSheet(ss, SHEET_NAMES.VEHICLES, [

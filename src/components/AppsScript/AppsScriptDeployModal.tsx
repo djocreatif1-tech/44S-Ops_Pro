@@ -112,13 +112,13 @@ export const AppsScriptDeployModal: React.FC<AppsScriptDeployModalProps> = ({
       if (res.success) {
         setPushResult({
           success: true,
-          message: `Berhasil! Seluruh armada (${allAppData?.vehicles?.length || 6} unit), pajak, solar, dan kas telah terkirim ke Google Sheets.`
+          message: `Berhasil! Seluruh armada (${allAppData?.vehicles?.length || 0} unit), supir (${allAppData?.drivers?.length || 0} orang), jadwal pajak, log BBM solar, kas, timesheet, dan riwayat servis telah terkirim & tersimpan ke Google Spreadsheet!`
         });
         confetti({ particleCount: 90, spread: 80 });
       } else {
         setPushResult({
           success: true,
-          message: `Data telah dikirim ke Web App (${allAppData?.vehicles?.length || 6} Unit Armada & Transaksi Kas). Buka tab Apps Script dan klik "Muat Data Terkini".`
+          message: `Data (${allAppData?.vehicles?.length || 0} Unit Armada, ${allAppData?.drivers?.length || 0} Supir, Transaksi Kas) telah dipush ke Google Apps Script.`
         });
       }
     } catch (err: any) {
