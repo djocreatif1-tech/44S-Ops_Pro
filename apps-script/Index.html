@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FleetOps Pro - Sistem Notifikasi & Operasional Armada</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 h-full flex flex-col antialiased">
+  <!-- Top Navigation -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 px-6 py-3.5 flex items-center justify-between shadow-2xs">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold text-base shadow-xs">
+        <i class="fa-solid fa-truck-ramp-box"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="font-bold text-sm text-slate-900 tracking-tight">FleetOps Pro</h1>
+          <span class="text-[10px] bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded-full border border-blue-200">Google Apps Script</span>
+        </div>
+        <p class="text-[11px] text-slate-400">Sistem Notifikasi & Manajemen Saldo Rekening Armada</p>
+      </div>
+    </div>
+    
+    <div class="flex items-center gap-3">
+      <button onclick="openConfigModal()" class="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition">
+        <i class="fa-solid fa-sliders text-slate-500"></i>
+        <span>Atur Notifikasi</span>
+      </button>
+      <button onclick="sendTestEmail()" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition">
+        <i class="fa-solid fa-envelope"></i>
+        <span>Kirim Alert Email</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Body -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6 overflow-y-auto">
+    <!-- Clean Minimalist Welcome Bar -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200 p-5 rounded-2xl shadow-xs">
+      <div>
+        <h2 class="text-lg font-bold text-slate-900">Pusat Pengingat & Notifikasi Operasional Kendaraan</h2>
+        <p class="text-xs text-slate-500 mt-0.5">Monitoring otomatis masa berlaku STNK & KIR, batas kilometer ganti oli servis rutin, dan konsumsi solar BBM.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Database Sheets Aktif
+        </span>
+      </div>
+    </div>
+
+    <!-- 1. NOTIFICATION CENTER (PAJAK, SERVIS, PENGISIAN BBM) -->
+    <section class="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+            <i class="fa-solid fa-bell text-sm"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">Daftar Pengingat Perlu Tindak Lanjut</h3>
+            <p class="text-[11px] text-slate-400">Dihitung otomatis berdasarkan konfigurasi toleransi hari & KM</p>
+          </div>
+        </div>
+
+        <!-- Filter tabs -->
+        <div class="flex items-center gap-1.5 bg-slate-50 p-1 rounded-lg border border-slate-200 text-xs">
+          <button onclick="filterNotifs('all')" id="btn-all" class="px-2.5 py-1 rounded-md font-semibold bg-white text-slate-800 shadow-2xs">Semua (4)</button>
+          <button onclick="filterNotifs('tax')" id="btn-tax" class="px-2.5 py-1 rounded-md font-medium text-slate-600 hover:text-slate-900">Pajak (2)</button>
+          <button onclick="filterNotifs('service')" id="btn-service" class="px-2.5 py-1 rounded-md font-medium text-slate-600 hover:text-slate-900">Servis (1)</button>
+          <button onclick="filterNotifs('fuel')" id="btn-fuel" class="px-2.5 py-1 rounded-md font-medium text-slate-600 hover:text-slate-900">BBM Solar (1)</button>
+        </div>
+      </div>
+
+      <!-- Notification Cards Grid -->
+      <div id="notifContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+        <!-- Tax Overdue -->
+        <div class="notif-item tax bg-rose-50/50 border border-rose-200 rounded-xl p-4 flex items-start gap-3.5">
+          <div class="w-8 h-8 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center shrink-0 mt-0.5">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+          <div class="flex-1">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full">Pajak Overdue</span>
+              <span class="text-[11px] font-mono text-rose-600 font-semibold">18 Agu 2026</span>
+            </div>
+            <h4 class="text-xs font-bold text-slate-900 mt-1">B 9811 TQ - Pajak Tahunan STNK</h4>
+            <p class="text-[11px] text-slate-600 mt-0.5">Masa berlaku dokumen telah terlewat 3 hari. Segera lakukan proses pembayaran di Samsat Cinere.</p>
+          </div>
+        </div>
+
+        <!-- Tax Warning -->
+        <div class="notif-item tax bg-amber-50/50 border border-amber-200 rounded-xl p-4 flex items-start gap-3.5">
+          <div class="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 mt-0.5">
+            <i class="fa-solid fa-file-shield"></i>
+          </div>
+          <div class="flex-1">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">KIR Segera Jatuh Tempo</span>
+              <span class="text-[11px] font-mono text-amber-600 font-semibold">27 Agu 2026</span>
+            </div>
+            <h4 class="text-xs font-bold text-slate-900 mt-1">B 9022 UY - Uji Berkala KIR Dishub</h4>
+            <p class="text-[11px] text-slate-600 mt-0.5">Sisa 6 hari sebelum masa uji habis. Siapkan fisik kendaraan dump truck dan jadwal booking Dishub.</p>
+          </div>
+        </div>
+
+        <!-- Service Warning -->
+        <div class="notif-item service bg-blue-50/50 border border-blue-200 rounded-xl p-4 flex items-start gap-3.5">
+          <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0 mt-0.5">
+            <i class="fa-solid fa-wrench"></i>
+          </div>
+          <div class="flex-1">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">Jadwal Ganti Oli</span>
+              <span class="text-[11px] font-mono text-blue-600 font-semibold">Sisa 450 KM</span>
+            </div>
+            <h4 class="text-xs font-bold text-slate-900 mt-1">B 9304 PXZ - Servis Rutin 10.000 KM</h4>
+            <p class="text-[11px] text-slate-600 mt-0.5">Odometer saat ini 44.550 KM (Target servis: 45.000 KM). Jadwalkan penggantian oli mesin Meditran & filter.</p>
+          </div>
+        </div>
+
+        <!-- Fuel Efficiency Warning -->
+        <div class="notif-item fuel bg-purple-50/50 border border-purple-200 rounded-xl p-4 flex items-start gap-3.5">
+          <div class="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center shrink-0 mt-0.5">
+            <i class="fa-solid fa-gas-pump"></i>
+          </div>
+          <div class="flex-1">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">Evaluasi Boros BBM</span>
+              <span class="text-[11px] font-mono text-purple-600 font-semibold">2.85 KM/L</span>
+            </div>
+            <h4 class="text-xs font-bold text-slate-900 mt-1">B 9410 TY - Rasio Konsumsi Rendah</h4>
+            <p class="text-[11px] text-slate-600 mt-0.5">Efisiensi pengisian terakhir tercatat 2.85 KM/L, di bawah target minimum 3.50 KM/L. Periksa nozzle injector / rute tanjakan.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. AKUN SALDO REKENING KEUANGAN -->
+    <section class="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+            <i class="fa-solid fa-wallet text-sm"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">Akun Saldo Rekening & Kas Keuangan</h3>
+            <p class="text-[11px] text-slate-400">Posisi likuiditas kas operasional, rekening giro bank, dan dana solar armada</p>
+          </div>
+        </div>
+        <div class="text-right">
+          <p class="text-[10px] text-slate-400 font-medium uppercase">Total Saldo Likuid</p>
+          <p class="text-lg font-bold text-slate-900 font-mono">Rp 206.100.000</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <!-- BCA Operasional -->
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">Bank Transfer</span>
+            <span class="text-xs font-bold text-emerald-600"><i class="fa-solid fa-circle-check"></i> Aktif</span>
+          </div>
+          <h4 class="text-xs font-bold text-slate-900 mt-2">BCA Operasional Logistik</h4>
+          <p class="text-[11px] font-mono text-slate-500">882-019-2811 (PT Armada Perkasa)</p>
+          <div class="mt-3 pt-2 border-t border-slate-200 flex items-baseline justify-between">
+            <span class="text-[10px] text-slate-400">Saldo Rekening:</span>
+            <span class="text-sm font-bold font-mono text-slate-900">Rp 145.250.000</span>
+          </div>
+        </div>
+
+        <!-- Mandiri Escrow Solar -->
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-bold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full">Escrow Solar</span>
+            <span class="text-xs font-bold text-emerald-600"><i class="fa-solid fa-circle-check"></i> Aktif</span>
+          </div>
+          <h4 class="text-xs font-bold text-slate-900 mt-2">Mandiri Escrow SPBU</h4>
+          <p class="text-[11px] font-mono text-slate-500">132-00-9821-4 (SPBU Partner)</p>
+          <div class="mt-3 pt-2 border-t border-slate-200 flex items-baseline justify-between">
+            <span class="text-[10px] text-slate-400">Saldo Rekening:</span>
+            <span class="text-sm font-bold font-mono text-slate-900">Rp 48.500.000</span>
+          </div>
+        </div>
+
+        <!-- Kas Tunai Pool -->
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">Kas Tunai</span>
+            <span class="text-xs font-bold text-emerald-600"><i class="fa-solid fa-circle-check"></i> Aktif</span>
+          </div>
+          <h4 class="text-xs font-bold text-slate-900 mt-2">Kas Tunai Pool & Tol</h4>
+          <p class="text-[11px] font-mono text-slate-500">KAS-POOL-01 (Bendahara Pool)</p>
+          <div class="mt-3 pt-2 border-t border-slate-200 flex items-baseline justify-between">
+            <span class="text-[10px] text-slate-400">Saldo Tunai:</span>
+            <span class="text-sm font-bold font-mono text-slate-900">Rp 12.350.000</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. PETUNJUK INTEGRASI & GOOGLE SCRIPT SETUP -->
+    <section class="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-3">
+      <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+        <i class="fa-solid fa-code text-blue-600"></i> Integrasi Google Apps Script & Trigger Otomatis
+      </h3>
+      <p class="text-xs text-slate-600 leading-relaxed">
+        Kode backend Google Apps Script telah terpasang dengan fungsi otomatis berikut:
+      </p>
+      <ul class="list-disc list-inside text-xs text-slate-600 space-y-1 pl-1">
+        <li><code class="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-blue-700 font-semibold">initSheetsDatabase()</code>: Membuat 10 tabel multi-sheet dan menyematkan header dengan warna terstandarisasi.</li>
+        <li><code class="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-blue-700 font-semibold">getNotificationAlerts()</code>: Mengecek jatuh tempo pajak, sisa KM servis, dan konsumsi solar BBM secara real-time.</li>
+        <li><code class="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-blue-700 font-semibold">setupDailyNotificationTrigger()</code>: Memasang cron trigger jam 07:00 pagi untuk kirim email digest ke manajemen.</li>
+      </ul>
+    </section>
+  </main>
+
+  <!-- Modal Konfigurasi Notifikasi Pengguna -->
+  <div id="configModal" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-6 shadow-xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <h3 class="font-bold text-sm text-slate-900 flex items-center gap-2">
+          <i class="fa-solid fa-sliders text-blue-600"></i> Atur Ambang Batas Notifikasi
+        </h3>
+        <button onclick="closeConfigModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="space-y-3.5 text-xs">
+        <div>
+          <label class="font-semibold text-slate-700 block mb-1">Peringatan Pajak (Hari sebelum Jatuh Tempo)</label>
+          <input type="number" id="cfgTaxDays" value="14" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:bg-white focus:outline-hidden focus:border-blue-500">
+        </div>
+
+        <div>
+          <label class="font-semibold text-slate-700 block mb-1">Peringatan Servis Rutin (Sisa Odometer KM)</label>
+          <input type="number" id="cfgServiceKm" value="1000" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:bg-white focus:outline-hidden focus:border-blue-500">
+        </div>
+
+        <div>
+          <label class="font-semibold text-slate-700 block mb-1">Batas Minimum Efisiensi BBM Solar (KM / Liter)</label>
+          <input type="number" step="0.1" id="cfgFuelMin" value="3.5" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:bg-white focus:outline-hidden focus:border-blue-500">
+        </div>
+
+        <div>
+          <label class="font-semibold text-slate-700 block mb-1">Email Penerima Digest Alert Harian</label>
+          <input type="email" id="cfgEmail" value="admin-fleet@company.com" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:bg-white focus:outline-hidden focus:border-blue-500">
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+        <button onclick="closeConfigModal()" class="px-3.5 py-2 border border-slate-200 rounded-lg text-slate-600 font-medium text-xs hover:bg-slate-50">Batal</button>
+        <button onclick="saveConfig()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-xs shadow-xs">Simpan Konfigurasi</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function filterNotifs(type) {
+      const items = document.querySelectorAll('.notif-item');
+      items.forEach(item => {
+        if (type === 'all' || item.classList.contains(type)) {
+          item.style.display = 'flex';
+        } else {
+          item.style.display = 'none';
+        }
+      });
+
+      const buttons = ['all', 'tax', 'service', 'fuel'];
+      buttons.forEach(b => {
+        const btn = document.getElementById('btn-' + b);
+        if (b === type) {
+          btn.className = 'px-2.5 py-1 rounded-md font-semibold bg-white text-slate-800 shadow-2xs';
+        } else {
+          btn.className = 'px-2.5 py-1 rounded-md font-medium text-slate-600 hover:text-slate-900';
+        }
+      });
+    }
+
+    function openConfigModal() {
+      document.getElementById('configModal').classList.remove('hidden');
+    }
+
+    function closeConfigModal() {
+      document.getElementById('configModal').classList.add('hidden');
+    }
+
+    function saveConfig() {
+      const taxDays = document.getElementById('cfgTaxDays').value;
+      const srvKm = document.getElementById('cfgServiceKm').value;
+      const fuelMin = document.getElementById('cfgFuelMin').value;
+      const email = document.getElementById('cfgEmail').value;
+
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler(function(res) {
+            alert('Pengaturan notifikasi berhasil disimpan!');
+            closeConfigModal();
+          })
+          .saveNotifConfig(null, {
+            taxDaysWarning: taxDays,
+            serviceKmWarning: srvKm,
+            fuelMinKmPerLiter: fuelMin,
+            recipientEmail: email
+          });
+      } else {
+        alert('Konfigurasi notifikasi berhasil diperbarui!');
+        closeConfigModal();
+      }
+    }
+
+    function sendTestEmail() {
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler(function(res) {
+            alert(res.message || 'Email notifikasi berhasil dikirim!');
+          })
+          .sendDailyNotificationEmail();
+      } else {
+        alert('Fitur kirim email digest alert aktif dan siap dijalankan via trigger Google Apps Script!');
+      }
+    }
+  </script>
+</body>
+</html>

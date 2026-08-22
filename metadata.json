@@ -1,0 +1,8 @@
+{
+  "name": "FleetOps Pro - Sistem Manajemen Operasional Kendaraan & Apps Script Ready",
+  "description": "Aplikasi komprehensif manajemen operasional armada kendaraan: monitoring pajak & STNK, konsumsi solar/BBM, keuangan & uang jalan, timesheet ritase driver, perawatan rutin/servis berkala, serta export siap deploy ke Google Apps Script (Kode.gs & Index.html).",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
