@@ -27,7 +27,7 @@ export const GAS_KODE_GS = `/**
  */
 
 var APP_TITLE = '44S Ops_pro - Sistem Manajemen Terpadu Operasional Kendaraan & Rekening Kas';
-var CACHE_KEY_ALL_DATA = '44S_OPS_CLEAN_CACHE_V6';
+var CACHE_KEY_ALL_DATA = '44S_OPS_CLEAN_CACHE_V7';
 var CACHE_TTL_SECONDS = 60;
 
 var SHEETS = {
@@ -51,22 +51,93 @@ var SHEETS = {
 };
 
 var SHEET_SCHEMAS = {};
-SHEET_SCHEMAS[SHEETS.VEHICLES] = ['id', 'nopol', 'brand', 'model', 'type', 'year', 'assignedDriver', 'status', 'currentOdometer', 'ownerCompany', 'capacityTon', 'stnk1YearDate', 'kirDate', 'stnk5YearDate', 'rawJson'];
-SHEET_SCHEMAS[SHEETS.TAXES] = ['id', 'vehicleId', 'nopol', 'documentType', 'dueDate', 'amount', 'status', 'lastPaymentDate', 'companyName', 'rawJson'];
-SHEET_SCHEMAS[SHEETS.FUEL] = ['id', 'vehicleId', 'nopol', 'date', 'volumeLiters', 'pricePerLiter', 'totalCost', 'odometer', 'fuelStation', 'driverName', 'companyName', 'rawJson'];
-SHEET_SCHEMAS[SHEETS.FINANCE] = ['id', 'date', 'type', 'category', 'amount', 'description', 'vehicleId', 'nopol', 'accountId', 'companyName', 'paymentMethod', 'status', 'rawJson'];
-SHEET_SCHEMAS[SHEETS.POCKET_FLOWS] = ['id', 'tripCode', 'date', 'driverName', 'nopol', 'ownerCompany', 'originLocation', 'destinationLocation', 'totalGiven', 'actualExpense', 'paymentMethod', 'status', 'rawJson'];
-SHEET_SCHEMAS[SHEETS.EQUIPMENT_FLOWS] = ['id', 'date', 'type', 'equipmentName', 'category', 'nopol', 'recipientName', 'ownerCompany', 'quantity', 'totalAmount', 'status', 'rawJson'];
-SHEET_SCHEMAS[SHEETS.TRIP_SHEETS] = ['id', 'tripNumber', 'suratJalanNumber', 'departureDate', 'nopol', 'driverName', 'ownerCompany', 'originLocation', 'destinationLocation', 'totalPocketDisbursed', 'actualTripExpense', 'status', 'rawJson'];
-SHEET_SCHEMAS[SHEETS.TIMESHEETS] = ['id', 'vehicleId', 'nopol', 'driverName', 'date', 'originLocation', 'destinationLocation', 'totalHours', 'tripCount', 'cargoTonnageTon', 'status', 'rawJson'];
-SHEET_SCHEMAS[SHEETS.MAINTENANCE] = ['id', 'workOrderNumber', 'vehicleId', 'nopol', 'serviceDate', 'serviceType', 'description', 'workshopName', 'mechanicName', 'odometerAtService', 'totalCost', 'status', 'rawJson'];
-SHEET_SCHEMAS[SHEETS.SPAREPARTS] = ['id', 'partCode', 'partName', 'category', 'condition', 'stockQty', 'minStockAlert', 'unit', 'unitPrice', 'storageLocation', 'ownerCompany', 'rawJson'];
-SHEET_SCHEMAS[SHEETS.SPAREPART_MOVEMENTS] = ['id', 'partId', 'partCode', 'partName', 'condition', 'date', 'movementType', 'qty', 'nopol', 'driverName', 'notes', 'rawJson'];
-SHEET_SCHEMAS[SHEETS.DRIVERS] = ['id', 'nip', 'name', 'phone', 'simType', 'simExpiryDate', 'assignedVehicle', 'companyName', 'status', 'rawJson'];
-SHEET_SCHEMAS[SHEETS.ACCOUNTS] = ['id', 'accountName', 'accountNumber', 'bankOrProvider', 'accountType', 'companyName', 'initialBalance', 'currentBalance', 'isActive', 'rawJson'];
-SHEET_SCHEMAS[SHEETS.COMPANY_DEPOSITS] = ['id', 'companyName', 'companyCode', 'picName', 'picPhone', 'initialDeposit', 'currentBalance', 'totalTopUp', 'totalUsed', 'status', 'rawJson'];
-SHEET_SCHEMAS[SHEETS.USERS] = ['id', 'username', 'name', 'email', 'phone', 'role', 'status', 'allowedModulesJson', 'lastLogin', 'rawJson'];
-SHEET_SCHEMAS[SHEETS.AUDIT_LOGS] = ['id', 'timestamp', 'userName', 'userRole', 'module', 'action', 'title', 'rawJson'];
+SHEET_SCHEMAS[SHEETS.VEHICLES] = [
+  'ID Unit', 'No. Polisi', 'Merk / Model', 'Tipe Kendaraan', 'Tahun',
+  'Bahan Bakar', 'No. Rangka', 'No. Mesin', 'Odometer Terkini (KM)',
+  'Status Operasi', 'Supir Tetap', 'No HP Supir',
+  'Jatuh Tempo Pajak 1 Thn', 'Jatuh Tempo Plat 5 Thn', 'Jatuh Tempo KIR',
+  'Target Km/Liter', 'Kapasitas (Ton)', 'Catatan',
+  'Perusahaan / Pemilik', 'Jatuh Tempo Asuransi', 'rawJson'
+];
+SHEET_SCHEMAS[SHEETS.TAXES] = [
+  'ID Pajak', 'ID Unit', 'No. Polisi', 'Jenis Dokumen',
+  'Tanggal Jatuh Tempo', 'Tgl Bayar Terakhir', 'Estimasi Biaya (Rp)',
+  'Denda (Rp)', 'Status', 'Samsat / Lokasi KIR', 'Keterangan',
+  'Perusahaan / Pemilik', 'rawJson'
+];
+SHEET_SCHEMAS[SHEETS.FUEL] = [
+  'ID Log', 'Tanggal', 'No. Polisi', 'Supir', 'Jenis BBM',
+  'Volume (Liter)', 'Harga per Liter (Rp)', 'Total Biaya (Rp)',
+  'Odometer Saat Ini', 'Jarak Tempuh (KM)', 'Konsumsi (KM/Liter)',
+  'Lokasi SPBU', 'Full Tank?', 'No. Struk', 'Catatan',
+  'Perusahaan / Pemilik', 'rawJson'
+];
+SHEET_SCHEMAS[SHEETS.FINANCE] = [
+  'ID Transaksi', 'Tanggal', 'No. Polisi', 'Supir', 'Kategori',
+  'Tipe (Debet/Kredit)', 'Jumlah (Rp)', 'Kode Trip / DO', 'Deskripsi',
+  'Metode Bayar', 'Status Validasi', 'No. Kuitansi',
+  'ID Akun Rekening', 'Nama Akun Rekening', 'Perusahaan / Pemilik', 'rawJson'
+];
+SHEET_SCHEMAS[SHEETS.POCKET_FLOWS] = [
+  'id', 'tripCode', 'date', 'driverName', 'nopol', 'ownerCompany',
+  'originLocation', 'destinationLocation', 'totalGiven', 'actualExpense',
+  'paymentMethod', 'status', 'rawJson'
+];
+SHEET_SCHEMAS[SHEETS.EQUIPMENT_FLOWS] = [
+  'id', 'date', 'type', 'equipmentName', 'category', 'nopol',
+  'recipientName', 'ownerCompany', 'quantity', 'totalAmount', 'status', 'rawJson'
+];
+SHEET_SCHEMAS[SHEETS.TRIP_SHEETS] = [
+  'id', 'tripNumber', 'suratJalanNumber', 'departureDate', 'nopol',
+  'driverName', 'ownerCompany', 'originLocation', 'destinationLocation',
+  'totalPocketDisbursed', 'actualTripExpense', 'status', 'rawJson'
+];
+SHEET_SCHEMAS[SHEETS.TIMESHEETS] = [
+  'ID Timesheet', 'Tanggal', 'No. Polisi', 'Supir', 'Kernet',
+  'Asal (Origin)', 'Tujuan (Destination)', 'Jam Mulai', 'Jam Selesai',
+  'Total Jam', 'Jam Lembur', 'Muatan Barang', 'Tonase (Ton)', 'Jumlah Rit',
+  'KM Awal', 'KM Akhir', 'Jarak (KM)', 'Status', 'Catatan',
+  'Perusahaan / Pemilik', 'rawJson'
+];
+SHEET_SCHEMAS[SHEETS.MAINTENANCE] = [
+  'ID Servis', 'Tanggal Servis', 'No. Polisi', 'Odometer Servis (KM)',
+  'Target Odo Berikutnya (KM)', 'Tgl Servis Berikutnya', 'Jenis Pekerjaan',
+  'Nama Bengkel / Montir', 'No. SPK / WO', 'Biaya Jasa (Rp)',
+  'Rincian Sparepart', 'Total Biaya (Rp)', 'Status', 'Catatan Servis',
+  'Perusahaan / Pemilik', 'rawJson'
+];
+SHEET_SCHEMAS[SHEETS.SPAREPARTS] = [
+  'id', 'partCode', 'partName', 'category', 'condition', 'stockQty',
+  'minStockAlert', 'unit', 'unitPrice', 'storageLocation', 'ownerCompany', 'rawJson'
+];
+SHEET_SCHEMAS[SHEETS.SPAREPART_MOVEMENTS] = [
+  'id', 'partId', 'partCode', 'partName', 'condition', 'date',
+  'movementType', 'qty', 'nopol', 'driverName', 'notes', 'rawJson'
+];
+SHEET_SCHEMAS[SHEETS.DRIVERS] = [
+  'ID Supir', 'Nama Lengkap', 'NIK KTP', 'No. WhatsApp / HP',
+  'Golongan SIM', 'No. SIM', 'Masa Berlaku SIM', 'Status Tugas',
+  'Tanggal Bergabung', 'Unit Pegangan (Nopol)', 'Perusahaan / Pemilik', 'rawJson'
+];
+SHEET_SCHEMAS[SHEETS.ACCOUNTS] = [
+  'ID Akun', 'Nama Akun / Rekening', 'Nomor Rekening', 'Bank / Penyedia',
+  'Tipe Akun', 'Saldo Awal (Rp)', 'Saldo Terkini (Rp)', 'Catatan',
+  'Perusahaan / Pemilik', 'rawJson'
+];
+SHEET_SCHEMAS[SHEETS.COMPANY_DEPOSITS] = [
+  'id', 'companyName', 'contactPerson', 'phone', 'depositedAmount',
+  'usedPocketMoney', 'usedFuelCost', 'remainingBalance', 'status',
+  'companyCode', 'rawJson'
+];
+SHEET_SCHEMAS[SHEETS.USERS] = [
+  'id', 'username', 'name', 'email', 'phone', 'role', 'status',
+  'allowedModulesJson', 'lastLogin', 'rawJson'
+];
+SHEET_SCHEMAS[SHEETS.AUDIT_LOGS] = [
+  'ID Log', 'Waktu Timestamp', 'User ID', 'Nama Pengguna',
+  'Hak Akses (Role)', 'Modul', 'Aksi', 'Keterangan Aktivitas',
+  'Detail Tambahan', 'rawJson'
+];
 
 /**
  * 1. HTTP GET HANDLER
@@ -630,22 +701,180 @@ function sanitizeRecordForDatabase(record) {
   return copy;
 }
 
+function resolveValueForHeader(record, h) {
+  if (!record || typeof record !== 'object') return '';
+  if (h === 'rawJson') {
+    var jsonStr = JSON.stringify(record);
+    return jsonStr.length > 48000 ? jsonStr.substring(0, 48000) : jsonStr;
+  }
+  if (h === 'allowedModulesJson' || h === 'Modul Aktif (JSON)') {
+    return JSON.stringify(record.allowedTabs || record.allowedModules || []);
+  }
+
+  // Exact match on record first (if not a JSON blob sitting in a display field)
+  if (record[h] !== undefined && record[h] !== null && record[h] !== '') {
+    var directVal = record[h];
+    if (!(typeof directVal === 'string' && directVal.trim().charAt(0) === '{')) {
+      return directVal;
+    }
+  }
+
+  var map = {
+    'ID Unit': record.id,
+    'ID Pajak': record.id,
+    'ID Log': record.id,
+    'ID Transaksi': record.id,
+    'ID Timesheet': record.id,
+    'ID Servis': record.id,
+    'ID Supir': record.id,
+    'ID Akun': record.id,
+    'id': record.id,
+
+    'No. Polisi': record.nopol,
+    'Unit Pegangan (Nopol)': record.assignedVehicle || record.nopol,
+    'nopol': record.nopol,
+
+    'Merk / Model': (record.brand || '') + (record.model && String(record.brand || '').indexOf(String(record.model)) === -1 ? ' ' + record.model : ''),
+    'Tipe Kendaraan': record.type,
+    'Tahun': record.year,
+    'Bahan Bakar': record.fuelType || 'Solar Dexlite',
+    'Jenis BBM': record.fuelType || 'Bio Solar',
+    'No. Rangka': record.chassisNumber || '',
+    'No. Mesin': record.engineNumber || '',
+    'Odometer Terkini (KM)': record.currentOdometer !== undefined ? record.currentOdometer : (record.odometer || 0),
+    'Odometer Saat Ini': record.odometer !== undefined ? record.odometer : (record.currentOdometer || 0),
+    'Odometer Servis (KM)': record.odometerAtService !== undefined ? record.odometerAtService : (record.odometer || 0),
+    'Status Operasi': record.status || 'active',
+    'Status Validasi': record.status || 'approved',
+    'Status Tugas': record.status || 'active',
+    'Status': record.status || 'active',
+    'Supir Tetap': record.assignedDriver || record.driverName || '',
+    'Supir': record.driverName || record.assignedDriver || '',
+    'No HP Supir': record.driverPhone || '',
+    'Jatuh Tempo Pajak 1 Thn': record.stnk1YearDate || '',
+    'Jatuh Tempo Plat 5 Thn': record.stnk5YearDate || '',
+    'Jatuh Tempo KIR': record.kirDate || '',
+    'Jatuh Tempo Asuransi': record.insuranceDate || '',
+    'Target Km/Liter': record.targetKmPerLiter !== undefined ? record.targetKmPerLiter : '',
+    'Kapasitas (Ton)': record.capacityTon !== undefined ? record.capacityTon : '',
+    'Perusahaan / Pemilik': record.ownerCompany || record.companyName || record.purchasedByCompany || record.sourceCompanyName || '',
+    'ownerCompany': record.ownerCompany || record.companyName || '',
+    'companyName': record.companyName || record.ownerCompany || '',
+    'Catatan': record.notes || record.description || '',
+    'Keterangan': record.notes || record.description || '',
+    'Catatan Servis': record.notes || record.description || '',
+
+    // Taxes
+    'ID Unit ': record.vehicleId,
+    'Jenis Dokumen': record.documentType || record.taxType || record.type || '',
+    'Tanggal Jatuh Tempo': record.dueDate || '',
+    'Tgl Bayar Terakhir': record.lastPaymentDate || record.paidDate || '',
+    'Estimasi Biaya (Rp)': record.amount !== undefined ? record.amount : (record.estimatedCost || 0),
+    'Denda (Rp)': record.penaltyAmount !== undefined ? record.penaltyAmount : 0,
+    'Samsat / Lokasi KIR': record.agentOrSamsat || record.samsatLocation || '',
+
+    // Fuel
+    'Tanggal': record.date || record.serviceDate || record.departureDate || '',
+    'Volume (Liter)': record.volumeLiters !== undefined ? record.volumeLiters : (record.liters || 0),
+    'Harga per Liter (Rp)': record.pricePerLiter !== undefined ? record.pricePerLiter : 0,
+    'Total Biaya (Rp)': record.totalCost !== undefined ? record.totalCost : (record.amount || 0),
+    'Jarak Tempuh (KM)': record.distanceTravelled !== undefined ? record.distanceTravelled : (record.distanceTraveled || 0),
+    'Konsumsi (KM/Liter)': record.calculatedKmPerLiter !== undefined ? record.calculatedKmPerLiter : (record.kmPerLiter || ''),
+    'Lokasi SPBU': record.fuelStation || record.stationName || '',
+    'Full Tank?': record.isFullTank === false ? 'Tidak' : 'Ya',
+    'No. Struk': record.receiptNumber || '',
+
+    // Finance
+    'Kategori': record.category || '',
+    'Tipe (Debet/Kredit)': record.type || '',
+    'Jumlah (Rp)': record.amount !== undefined ? record.amount : 0,
+    'Kode Trip / DO': record.tripCode || record.tripRoute || '',
+    'Deskripsi': record.description || record.notes || '',
+    'Metode Bayar': record.paymentMethod || '',
+    'No. Kuitansi': record.receiptNumber || record.referenceNo || '',
+    'ID Akun Rekening': record.accountId || '',
+    'Nama Akun Rekening': record.accountName || '',
+
+    // Timesheets
+    'Kernet': record.helperName || '',
+    'Asal (Origin)': record.originLocation || '',
+    'Tujuan (Destination)': record.destinationLocation || '',
+    'Jam Mulai': record.startTime || '',
+    'Jam Selesai': record.endTime || '',
+    'Total Jam': record.totalHours !== undefined ? record.totalHours : 0,
+    'Jam Lembur': record.overtimeHours !== undefined ? record.overtimeHours : 0,
+    'Muatan Barang': record.cargoDescription || record.cargoType || '',
+    'Tonase (Ton)': record.cargoTonnageTon !== undefined ? record.cargoTonnageTon : 0,
+    'Jumlah Rit': record.tripCount !== undefined ? record.tripCount : 1,
+    'KM Awal': record.startKm !== undefined ? record.startKm : 0,
+    'KM Akhir': record.endKm !== undefined ? record.endKm : 0,
+    'Jarak (KM)': record.totalDistanceKm !== undefined ? record.totalDistanceKm : 0,
+
+    // Maintenance
+    'Tanggal Servis': record.serviceDate || record.date || '',
+    'Target Odo Berikutnya (KM)': record.nextServiceOdometer !== undefined ? record.nextServiceOdometer : '',
+    'Tgl Servis Berikutnya': record.nextServiceDate || '',
+    'Jenis Pekerjaan': record.serviceType || '',
+    'Nama Bengkel / Montir': (record.workshopName || '') + (record.mechanicName ? ' / ' + record.mechanicName : ''),
+    'No. SPK / WO': record.workOrderNumber || '',
+    'Biaya Jasa (Rp)': record.laborCost !== undefined ? record.laborCost : 0,
+    'Rincian Sparepart': Array.isArray(record.spareparts)
+      ? record.spareparts.map(function(p) { return (p.name || p.partName || '') + ' (' + (p.qty || 1) + ')'; }).join(', ')
+      : (record.partsReplaced || record.description || ''),
+
+    // Drivers
+    'Nama Lengkap': record.name || '',
+    'NIK KTP': record.nik || record.nip || '',
+    'No. WhatsApp / HP': record.phone || '',
+    'Golongan SIM': record.simType || '',
+    'No. SIM': record.simNumber || '',
+    'Masa Berlaku SIM': record.simExpiry || record.simExpiryDate || '',
+    'Tanggal Bergabung': record.joinDate || '',
+
+    // Accounts
+    'Nama Akun / Rekening': record.accountName || '',
+    'Nomor Rekening': record.accountNumber || '',
+    'Bank / Penyedia': record.bankOrProvider || record.bankName || '',
+    'Tipe Akun': record.accountType || '',
+    'Saldo Awal (Rp)': record.initialBalance !== undefined ? record.initialBalance : 0,
+    'Saldo Terkini (Rp)': record.currentBalance !== undefined ? record.currentBalance : 0,
+
+    // Company Deposits
+    'contactPerson': record.picName || record.contactPerson || '',
+    'phone': record.picPhone || record.phone || '',
+    'depositedAmount': record.initialDeposit !== undefined ? record.initialDeposit : (record.depositedAmount || 0),
+    'usedPocketMoney': record.totalTopUp !== undefined ? record.totalTopUp : (record.usedPocketMoney || 0),
+    'usedFuelCost': record.totalUsed !== undefined ? record.totalUsed : (record.usedFuelCost || 0),
+    'remainingBalance': record.currentBalance !== undefined ? record.currentBalance : (record.remainingBalance || 0),
+    'companyCode': record.companyCode || '',
+
+    // Audit Logs
+    'Waktu Timestamp': record.timestamp || '',
+    'User ID': record.userId || '',
+    'Nama Pengguna': record.userName || '',
+    'Hak Akses (Role)': record.userRole || '',
+    'Modul': record.module || '',
+    'Aksi': record.action || '',
+    'Keterangan Aktivitas': record.description || record.title || '',
+    'Detail Tambahan': record.targetName ? ((record.title || '') + ' [' + record.targetName + ']') : (record.title || '')
+  };
+
+  if (h === 'ID Unit' && record.vehicleId && !record.nopol && !record.brand) {
+    return record.vehicleId;
+  }
+  if (h === 'ID Unit' && record.vehicleId && record.documentType) {
+    return record.vehicleId;
+  }
+
+  var mapped = map[h];
+  return (mapped !== undefined && mapped !== null) ? mapped : '';
+}
+
 function mapRecordToRow(record, headers) {
   var row = [];
   for (var i = 0; i < headers.length; i++) {
     var h = headers[i];
-    if (h === 'rawJson') {
-      var jsonStr = JSON.stringify(record);
-      row.push(jsonStr.length > 48000 ? jsonStr.substring(0, 48000) : jsonStr);
-    } else if (h === 'allowedModulesJson') {
-      row.push(JSON.stringify(record.allowedTabs || record.allowedModules || []));
-    } else if (h === 'ownerCompany' || h === 'companyName') {
-      var compVal = record.ownerCompany || record.companyName || record.purchasedByCompany || record.sourceCompanyName || '';
-      row.push(compVal);
-    } else {
-      var val = record[h];
-      row.push(val !== undefined && val !== null ? val : '');
-    }
+    row.push(resolveValueForHeader(record, h));
   }
   return row;
 }
@@ -665,6 +894,104 @@ function compactSheetCells(sheet, keepMinRows, keepCols) {
   } catch (ignore) {}
 }
 
+function autoRepairSheetAlignment(sheet, sheetName, headers) {
+  try {
+    var lastRow = sheet.getLastRow();
+    if (lastRow <= 1) return;
+    var lastCol = Math.max(sheet.getLastColumn(), headers.length);
+    var values = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+    var rawJsonColIdx = headers.indexOf('rawJson');
+    var needsRewrite = false;
+    var repairedRows = [];
+
+    for (var i = 0; i < values.length; i++) {
+      var row = values[i];
+      var embeddedObj = null;
+      var foundJsonCol = -1;
+
+      for (var c = row.length - 1; c >= 0; c--) {
+        var cell = row[c];
+        if (typeof cell === 'string') {
+          var trimmed = cell.trim();
+          if (trimmed.length > 10 && trimmed.charAt(0) === '{' && trimmed.charAt(trimmed.length - 1) === '}') {
+            try {
+              var parsed = JSON.parse(trimmed);
+              if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                embeddedObj = parsed;
+                foundJsonCol = c;
+                break;
+              }
+            } catch (e) {}
+          }
+        }
+      }
+
+      if (embeddedObj && foundJsonCol !== rawJsonColIdx) {
+        needsRewrite = true;
+        repairedRows.push(mapRecordToRow(sanitizeRecordForDatabase(embeddedObj), headers));
+      } else if (!embeddedObj && sheetName === SHEETS.DRIVERS && typeof row[1] === 'string' && row[1].indexOf('DRV-') === 0) {
+        needsRewrite = true;
+        var drvObj = {
+          id: row[0],
+          nip: row[1],
+          name: row[2],
+          nik: row[1],
+          phone: row[3],
+          simType: row[4] || 'SIM B2 Umum',
+          simNumber: '',
+          simExpiry: row[5],
+          assignedVehicle: row[6],
+          companyName: row[7],
+          status: row[8] || 'active'
+        };
+        repairedRows.push(mapRecordToRow(drvObj, headers));
+      } else if (!embeddedObj && sheetName === SHEETS.ACCOUNTS && typeof row[5] === 'string' && typeof row[7] === 'number') {
+        needsRewrite = true;
+        var accObj = {
+          id: row[0],
+          accountName: row[1],
+          accountNumber: row[2],
+          bankOrProvider: row[3],
+          accountType: row[4],
+          companyName: row[5],
+          initialBalance: row[6],
+          currentBalance: row[7],
+          notes: ''
+        };
+        repairedRows.push(mapRecordToRow(accObj, headers));
+      } else if (!embeddedObj && sheetName === SHEETS.COMPANY_DEPOSITS && typeof row[8] === 'number') {
+        needsRewrite = true;
+        var depObj = {
+          id: row[0],
+          companyName: row[1],
+          companyCode: row[2],
+          picName: row[3],
+          picPhone: row[4],
+          initialDeposit: row[5],
+          currentBalance: row[6],
+          totalTopUp: row[7],
+          totalUsed: row[8],
+          status: 'active'
+        };
+        repairedRows.push(mapRecordToRow(depObj, headers));
+      } else {
+        var padded = [];
+        for (var k = 0; k < headers.length; k++) {
+          padded.push(k < row.length ? row[k] : '');
+        }
+        repairedRows.push(padded);
+      }
+    }
+
+    if (needsRewrite && repairedRows.length > 0) {
+      if (lastCol > headers.length) {
+        sheet.getRange(2, 1, repairedRows.length, lastCol).clearContent();
+      }
+      sheet.getRange(2, 1, repairedRows.length, headers.length).setValues(repairedRows);
+    }
+  } catch (ignore) {}
+}
+
 function getOrCreateSheetWithSchema(ss, sheetName, headers) {
   var sheet = ss.getSheetByName(sheetName);
   if (!sheet) {
@@ -677,10 +1004,9 @@ function getOrCreateSheetWithSchema(ss, sheetName, headers) {
     sheet.setFrozenRows(1);
     compactSheetCells(sheet, 15, headers.length);
   } else {
-    // Auto-heal Row 1 headers if rawJson is missing or header count changed
     var lastCol = Math.max(sheet.getLastColumn(), 1);
     var currentHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-    if (currentHeaders.indexOf('rawJson') === -1 || currentHeaders.length < headers.length) {
+    if (currentHeaders.indexOf('rawJson') === -1 || currentHeaders.length !== headers.length || currentHeaders[0] !== headers[0]) {
       sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
       sheet.getRange(1, 1, 1, headers.length)
         .setFontWeight('bold')
@@ -688,6 +1014,7 @@ function getOrCreateSheetWithSchema(ss, sheetName, headers) {
         .setFontColor('#ffffff');
       sheet.setFrozenRows(1);
     }
+    autoRepairSheetAlignment(sheet, sheetName, headers);
   }
   return sheet;
 }

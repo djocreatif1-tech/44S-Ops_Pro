@@ -191,6 +191,18 @@ export const VehicleList: React.FC<VehicleListProps> = ({
       fuelType: (vehicle.fuelType || 'Bio Solar') as FuelType,
       assignedDriver: vehicle.assignedDriver === '-' ? '' : (vehicle.assignedDriver || ''),
       driverPhone: vehicle.driverPhone === '-' ? '' : (vehicle.driverPhone || ''),
+      chassisNumber:
+        !vehicle.chassisNumber ||
+        vehicle.chassisNumber === '-' ||
+        ['active', 'maintenance', 'standby', 'broken'].includes(String(vehicle.chassisNumber).toLowerCase())
+          ? ''
+          : vehicle.chassisNumber,
+      engineNumber:
+        !vehicle.engineNumber ||
+        vehicle.engineNumber === '-' ||
+        String(vehicle.engineNumber) === String(vehicle.currentOdometer)
+          ? ''
+          : String(vehicle.engineNumber),
       ownerCompany: vehicle.ownerCompany || 'PT Transindo Logistik',
       stnk1YearDate: cleanDateInput(vehicle.stnk1YearDate),
       stnk5YearDate: cleanDateInput(vehicle.stnk5YearDate),
@@ -942,6 +954,28 @@ export const VehicleList: React.FC<VehicleListProps> = ({
                     <option value="Pertalite">Pertalite</option>
                     <option value="Pertamax">Pertamax</option>
                   </select>
+                </div>
+
+                <div>
+                  <label className="text-slate-700 font-semibold block mb-1">No. Rangka (VIN / Chassis)</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: MHMFE74P5NK012345"
+                    value={formData.chassisNumber || ''}
+                    onChange={(e) => setFormData({ ...formData, chassisNumber: e.target.value.toUpperCase() })}
+                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-800 font-mono uppercase focus:outline-hidden focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-700 font-semibold block mb-1">No. Mesin</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: W04D-TR123456"
+                    value={formData.engineNumber || ''}
+                    onChange={(e) => setFormData({ ...formData, engineNumber: e.target.value.toUpperCase() })}
+                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-800 font-mono uppercase focus:outline-hidden focus:border-blue-500"
+                  />
                 </div>
 
                 <div>

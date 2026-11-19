@@ -312,7 +312,34 @@ export function normalizeSingleRecord(raw: any, index: number, prefix = 'REC'): 
     }
   }
 
-  // 5. Normalize date fields to YYYY-MM-DD for HTML date inputs and badge calculations
+  // 5. Guard against legacy misaligned vehicle columns (e.g. Bahan Bakar containing driver name or No. Rangka containing status)
+  const validFuelTypes = ['Bio Solar', 'Solar Dexlite', 'Pertamina Dex', 'Pertalite', 'Pertamax'];
+  if (typeof merged.fuelType === 'string' && merged.fuelType.trim() !== '') {
+    const matchedFuel = validFuelTypes.find((ft) => ft.toLowerCase() === merged.fuelType.trim().toLowerCase());
+    if (matchedFuel) {
+      merged.fuelType = matchedFuel;
+    } else if (!/solar|dex|pertalite|pertamax|bbm|bensin/i.test(merged.fuelType)) {
+      if (!merged.assignedDriver || merged.assignedDriver === '-') {
+        merged.assignedDriver = merged.fuelType.trim();
+      }
+      merged.fuelType = 'Solar Dexlite';
+    }
+  }
+  if (
+    typeof merged.chassisNumber === 'string' &&
+    ['active', 'maintenance', 'standby', 'broken', '-'].includes(merged.chassisNumber.trim().toLowerCase())
+  ) {
+    merged.chassisNumber = '';
+  }
+  if (
+    merged.engineNumber !== undefined &&
+    (String(merged.engineNumber).trim() === '-' ||
+      (typeof merged.engineNumber === 'number' && merged.engineNumber === Number(merged.currentOdometer)))
+  ) {
+    merged.engineNumber = '';
+  }
+
+  // 6. Normalize date fields to YYYY-MM-DD for HTML date inputs and badge calculations
   for (const df of DATE_FIELDS) {
     if (typeof merged[df] === 'string') {
       const trimmedDate = merged[df].trim();
@@ -324,7 +351,7 @@ export function normalizeSingleRecord(raw: any, index: number, prefix = 'REC'): 
     }
   }
 
-  // 6. Guarantee a non-empty ID
+  // 7. Guarantee a non-empty ID
   const rawId = String(merged.id ?? '').trim();
   if (!rawId || rawId === 'undefined' || rawId === 'null') {
     merged.id = `${prefix}-ROW-${index + 1}`;
