@@ -171,6 +171,9 @@ export const VehicleList: React.FC<VehicleListProps> = ({
     setEditingVehicle(vehicle);
     setFormData({
       ...vehicle,
+      nopol: vehicle.nopol === '-' ? '' : (vehicle.nopol || ''),
+      brand: vehicle.brand === '-' ? '' : (vehicle.brand || ''),
+      assignedDriver: vehicle.assignedDriver === '-' ? '' : (vehicle.assignedDriver || ''),
       ownerCompany: vehicle.ownerCompany || 'PT Transindo Logistik'
     });
     setIsModalOpen(true);
@@ -178,19 +181,24 @@ export const VehicleList: React.FC<VehicleListProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.nopol || !formData.brand) return;
+    const cleanNopol = (formData.nopol || '').toUpperCase().trim();
+    const cleanBrand = (formData.brand || '').trim();
+    if (!cleanNopol || !cleanBrand) return;
 
     if (editingVehicle) {
       onUpdateVehicle({
         ...editingVehicle,
         ...formData,
+        id: editingVehicle.id || ('VH-' + Date.now().toString().slice(-4)),
+        nopol: cleanNopol,
+        brand: cleanBrand,
         ownerCompany: formData.ownerCompany || 'PT Transindo Logistik'
       } as Vehicle);
     } else {
       const newVehicle: Vehicle = {
         id: 'VH-' + Date.now().toString().slice(-4),
-        nopol: (formData.nopol || '').toUpperCase(),
-        brand: formData.brand || '',
+        nopol: cleanNopol,
+        brand: cleanBrand,
         model: formData.model || '',
         type: formData.type || 'Truk Box',
         year: formData.year || 2023,
@@ -216,7 +224,8 @@ export const VehicleList: React.FC<VehicleListProps> = ({
   };
 
   const handleDelete = (id: string, nopol: string) => {
-    confirmDelete(`Yakin ingin menghapus unit kendaraan ${nopol}?`).then((ok) => {
+    const label = nopol && nopol !== '-' ? nopol : `ID: ${id}`;
+    confirmDelete(`Yakin ingin menghapus unit kendaraan ${label}?`).then((ok) => {
       if (ok) onDeleteVehicle(id);
     });
   };

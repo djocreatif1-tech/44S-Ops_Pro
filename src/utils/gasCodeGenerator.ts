@@ -51,18 +51,18 @@ var SHEETS = {
 };
 
 var SHEET_SCHEMAS = {};
-SHEET_SCHEMAS[SHEETS.VEHICLES] = ['id', 'nopol', 'brand', 'type', 'year', 'assignedDriver', 'status', 'currentOdometer', 'companyName', 'capacityTon', 'rawJson'];
-SHEET_SCHEMAS[SHEETS.TAXES] = ['id', 'vehicleId', 'nopol', 'taxType', 'dueDate', 'estimatedCost', 'status', 'paidDate', 'companyName', 'rawJson'];
-SHEET_SCHEMAS[SHEETS.FUEL] = ['id', 'vehicleId', 'nopol', 'date', 'liters', 'pricePerLiter', 'totalCost', 'odometer', 'stationName', 'driverName', 'companyName', 'rawJson'];
-SHEET_SCHEMAS[SHEETS.FINANCE] = ['id', 'date', 'type', 'category', 'amount', 'description', 'vehicleId', 'accountId', 'companyName', 'paymentMethod', 'status', 'rawJson'];
-SHEET_SCHEMAS[SHEETS.POCKET_FLOWS] = ['id', 'date', 'flowType', 'category', 'driverName', 'nopol', 'companyName', 'route', 'amount', 'paymentMethod', 'status', 'rawJson'];
-SHEET_SCHEMAS[SHEETS.EQUIPMENT_FLOWS] = ['id', 'date', 'flowType', 'itemName', 'category', 'nopol', 'recipientName', 'companyName', 'qty', 'totalAmount', 'status', 'rawJson'];
-SHEET_SCHEMAS[SHEETS.TRIP_SHEETS] = ['id', 'doNumber', 'date', 'nopol', 'driverName', 'companyName', 'origin', 'destination', 'totalPocketMoney', 'realizedExpense', 'status', 'rawJson'];
-SHEET_SCHEMAS[SHEETS.TIMESHEETS] = ['id', 'vehicleId', 'nopol', 'driverName', 'date', 'companyName', 'clientName', 'route', 'totalHours', 'totalRevenue', 'status', 'rawJson'];
-SHEET_SCHEMAS[SHEETS.MAINTENANCE] = ['id', 'vehicleId', 'nopol', 'date', 'serviceType', 'description', 'workshopName', 'mechanicName', 'odometer', 'cost', 'status', 'companyName', 'rawJson'];
-SHEET_SCHEMAS[SHEETS.SPAREPARTS] = ['id', 'partCode', 'partName', 'category', 'condition', 'stockQty', 'minStockAlert', 'unit', 'unitPrice', 'rackLocation', 'companyName', 'rawJson'];
-SHEET_SCHEMAS[SHEETS.SPAREPART_MOVEMENTS] = ['id', 'partId', 'partCode', 'partName', 'condition', 'date', 'movementType', 'qty', 'nopol', 'mechanicOrStaffName', 'notes', 'rawJson'];
-SHEET_SCHEMAS[SHEETS.DRIVERS] = ['id', 'nip', 'name', 'phone', 'simClass', 'simExpiry', 'assignedVehicle', 'companyName', 'status', 'rawJson'];
+SHEET_SCHEMAS[SHEETS.VEHICLES] = ['id', 'nopol', 'brand', 'model', 'type', 'year', 'assignedDriver', 'status', 'currentOdometer', 'ownerCompany', 'capacityTon', 'stnk1YearDate', 'kirDate', 'stnk5YearDate', 'rawJson'];
+SHEET_SCHEMAS[SHEETS.TAXES] = ['id', 'vehicleId', 'nopol', 'documentType', 'dueDate', 'amount', 'status', 'lastPaymentDate', 'companyName', 'rawJson'];
+SHEET_SCHEMAS[SHEETS.FUEL] = ['id', 'vehicleId', 'nopol', 'date', 'volumeLiters', 'pricePerLiter', 'totalCost', 'odometer', 'fuelStation', 'driverName', 'companyName', 'rawJson'];
+SHEET_SCHEMAS[SHEETS.FINANCE] = ['id', 'date', 'type', 'category', 'amount', 'description', 'vehicleId', 'nopol', 'accountId', 'companyName', 'paymentMethod', 'status', 'rawJson'];
+SHEET_SCHEMAS[SHEETS.POCKET_FLOWS] = ['id', 'tripCode', 'date', 'driverName', 'nopol', 'ownerCompany', 'originLocation', 'destinationLocation', 'totalGiven', 'actualExpense', 'paymentMethod', 'status', 'rawJson'];
+SHEET_SCHEMAS[SHEETS.EQUIPMENT_FLOWS] = ['id', 'date', 'type', 'equipmentName', 'category', 'nopol', 'recipientName', 'ownerCompany', 'quantity', 'totalAmount', 'status', 'rawJson'];
+SHEET_SCHEMAS[SHEETS.TRIP_SHEETS] = ['id', 'tripNumber', 'suratJalanNumber', 'departureDate', 'nopol', 'driverName', 'ownerCompany', 'originLocation', 'destinationLocation', 'totalPocketDisbursed', 'actualTripExpense', 'status', 'rawJson'];
+SHEET_SCHEMAS[SHEETS.TIMESHEETS] = ['id', 'vehicleId', 'nopol', 'driverName', 'date', 'originLocation', 'destinationLocation', 'totalHours', 'tripCount', 'cargoTonnageTon', 'status', 'rawJson'];
+SHEET_SCHEMAS[SHEETS.MAINTENANCE] = ['id', 'workOrderNumber', 'vehicleId', 'nopol', 'serviceDate', 'serviceType', 'description', 'workshopName', 'mechanicName', 'odometerAtService', 'totalCost', 'status', 'rawJson'];
+SHEET_SCHEMAS[SHEETS.SPAREPARTS] = ['id', 'partCode', 'partName', 'category', 'condition', 'stockQty', 'minStockAlert', 'unit', 'unitPrice', 'storageLocation', 'ownerCompany', 'rawJson'];
+SHEET_SCHEMAS[SHEETS.SPAREPART_MOVEMENTS] = ['id', 'partId', 'partCode', 'partName', 'condition', 'date', 'movementType', 'qty', 'nopol', 'driverName', 'notes', 'rawJson'];
+SHEET_SCHEMAS[SHEETS.DRIVERS] = ['id', 'nip', 'name', 'phone', 'simType', 'simExpiryDate', 'assignedVehicle', 'companyName', 'status', 'rawJson'];
 SHEET_SCHEMAS[SHEETS.ACCOUNTS] = ['id', 'accountName', 'accountNumber', 'bankOrProvider', 'accountType', 'companyName', 'initialBalance', 'currentBalance', 'isActive', 'rawJson'];
 SHEET_SCHEMAS[SHEETS.COMPANY_DEPOSITS] = ['id', 'companyName', 'companyCode', 'picName', 'picPhone', 'initialDeposit', 'currentBalance', 'totalTopUp', 'totalUsed', 'status', 'rawJson'];
 SHEET_SCHEMAS[SHEETS.USERS] = ['id', 'username', 'name', 'email', 'phone', 'role', 'status', 'allowedModulesJson', 'lastLogin', 'rawJson'];
@@ -253,8 +253,7 @@ function processApiAction(payload) {
       invalidateFastCache();
       return { status: 'success', action: action, result: upRes };
     } else if (target.mode === 'delete') {
-      var delId = (itemData && typeof itemData === 'object' && itemData.id) ? itemData.id : itemData;
-      var delRes = deleteRowById(ss, target.sheet, delId);
+      var delRes = deleteRowById(ss, target.sheet, itemData);
       invalidateFastCache();
       return { status: 'success', action: action, result: delRes };
     }
@@ -276,6 +275,14 @@ function processApiAction(payload) {
     return { status: 'success', action: action };
   }
 
+  if (action === 'transferBalance' && itemData) {
+    if (itemData.fromAccount) upsertSingleRecord(ss, SHEETS.ACCOUNTS, itemData.fromAccount);
+    if (itemData.toAccount) upsertSingleRecord(ss, SHEETS.ACCOUNTS, itemData.toAccount);
+    if (itemData.transferTx) upsertSingleRecord(ss, SHEETS.FINANCE, itemData.transferTx);
+    invalidateFastCache();
+    return { status: 'success', action: action };
+  }
+
   if (action === 'upsertRecord') {
     var sheetName = resolveSheetName(payload.module);
     if (!sheetName) return { status: 'error', message: 'Modul tidak dikenali: ' + payload.module };
@@ -287,8 +294,8 @@ function processApiAction(payload) {
   if (action === 'deleteRecord') {
     var delSheetName = resolveSheetName(payload.module);
     if (!delSheetName) return { status: 'error', message: 'Modul tidak dikenali: ' + payload.module };
-    var targetDelId = payload.id || (itemData && itemData.id) || itemData;
-    var resDel = deleteRowById(ss, delSheetName, targetDelId);
+    var targetDelPayload = itemData || payload;
+    var resDel = deleteRowById(ss, delSheetName, targetDelPayload);
     invalidateFastCache();
     return { status: 'success', module: payload.module, result: resDel };
   }
@@ -367,37 +374,118 @@ function readSheetFast(ss, sheetName) {
 
   var values = sheet.getRange(1, 1, lastRow, lastCol).getValues();
   var headers = values[0];
-  var rawJsonIdx = headers.indexOf('rawJson');
+  var schemaHeaders = SHEET_SCHEMAS[sheetName] || [];
   var results = [];
 
   for (var i = 1; i < values.length; i++) {
     var row = values[i];
-    if (!row[0] && row[0] !== 0) continue;
 
-    if (rawJsonIdx !== -1 && row[rawJsonIdx]) {
-      try {
-        var parsedObj = JSON.parse(String(row[rawJsonIdx]));
-        if (parsedObj && typeof parsedObj === 'object') {
-          results.push(parsedObj);
-          continue;
-        }
-      } catch (err) {}
-    }
-
-    var obj = {};
-    for (var c = 0; c < headers.length; c++) {
-      var key = headers[c];
-      if (!key || key === 'rawJson') continue;
-      var val = row[c];
-      if (val instanceof Date) {
-        obj[key] = Utilities.formatDate(val, Session.getScriptTimeZone() || 'Asia/Jakarta', 'yyyy-MM-dd');
-      } else {
-        obj[key] = val;
+    // Skip completely empty rows
+    var hasAnyValue = false;
+    for (var k = 0; k < row.length; k++) {
+      if (row[k] !== '' && row[k] !== null && row[k] !== undefined) {
+        hasAnyValue = true;
+        break;
       }
     }
-    if (obj.plateNumber && !obj.nopol) obj.nopol = obj.plateNumber;
-    if (obj.fullName && !obj.name) obj.name = obj.fullName;
-    results.push(obj);
+    if (!hasAnyValue) continue;
+
+    var parsedObj = null;
+    // 1. Scan all cells in the row right-to-left for a valid JSON object string ({...})
+    for (var j = row.length - 1; j >= 0; j--) {
+      var cellVal = row[j];
+      if (typeof cellVal === 'string') {
+        var trimmed = cellVal.trim();
+        if (trimmed.length > 10 && trimmed.charAt(0) === '{' && trimmed.charAt(trimmed.length - 1) === '}') {
+          try {
+            var candidate = JSON.parse(trimmed);
+            if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
+              parsedObj = candidate;
+              break;
+            }
+          } catch (err) {}
+        }
+      }
+    }
+
+    // 2. Also extract column values using actual headers AND schema headers
+    var colObj = {};
+    for (var c = 0; c < row.length; c++) {
+      var val = row[c];
+      if (val === '' || val === null || val === undefined) continue;
+      if (typeof val === 'string' && val.trim().charAt(0) === '{' && val.trim().charAt(val.trim().length - 1) === '}') {
+        continue;
+      }
+      var formattedVal = (val instanceof Date)
+        ? Utilities.formatDate(val, Session.getScriptTimeZone() || 'Asia/Jakarta', 'yyyy-MM-dd')
+        : val;
+
+      var headerKey = headers[c] ? String(headers[c]).trim() : '';
+      if (headerKey && headerKey !== 'rawJson') {
+        colObj[headerKey] = formattedVal;
+      }
+      var schemaKey = schemaHeaders[c];
+      if (schemaKey && schemaKey !== 'rawJson' && colObj[schemaKey] === undefined) {
+        colObj[schemaKey] = formattedVal;
+      }
+    }
+
+    var finalObj = parsedObj ? parsedObj : colObj;
+    if (parsedObj) {
+      for (var ck in colObj) {
+        if (finalObj[ck] === undefined || finalObj[ck] === '' || finalObj[ck] === null) {
+          finalObj[ck] = colObj[ck];
+        }
+      }
+    }
+
+    // 3. Normalize common aliases
+    if (!finalObj.id) {
+      finalObj.id = finalObj.ID || finalObj.Id || (row[0] ? String(row[0]).trim() : '');
+    }
+    if (!finalObj.id) {
+      finalObj.id = 'ROW-' + i;
+      try { sheet.getRange(i + 1, 1).setValue(finalObj.id); } catch (ignore) {}
+    } else {
+      finalObj.id = String(finalObj.id).trim();
+    }
+
+    if (!finalObj.nopol && (finalObj.plateNumber || finalObj.No_Polisi || finalObj['No. Polisi'])) {
+      finalObj.nopol = finalObj.plateNumber || finalObj.No_Polisi || finalObj['No. Polisi'];
+    }
+    if (!finalObj.ownerCompany && finalObj.companyName) {
+      finalObj.ownerCompany = finalObj.companyName;
+    }
+    if (!finalObj.companyName && finalObj.ownerCompany) {
+      finalObj.companyName = finalObj.ownerCompany;
+    }
+    if (!finalObj.name && finalObj.fullName) {
+      finalObj.name = finalObj.fullName;
+    }
+    if (!finalObj.documentType && finalObj.taxType) {
+      finalObj.documentType = finalObj.taxType;
+    }
+    if (finalObj.amount === undefined && finalObj.estimatedCost !== undefined) {
+      finalObj.amount = finalObj.estimatedCost;
+    }
+    if (!finalObj.volumeLiters && finalObj.liters) {
+      finalObj.volumeLiters = finalObj.liters;
+    }
+    if (!finalObj.fuelStation && finalObj.stationName) {
+      finalObj.fuelStation = finalObj.stationName;
+    }
+    if (!finalObj.equipmentName && finalObj.itemName) {
+      finalObj.equipmentName = finalObj.itemName;
+    }
+    if (finalObj.quantity === undefined && finalObj.qty !== undefined) {
+      finalObj.quantity = finalObj.qty;
+    }
+    if (!finalObj.suratJalanNumber && finalObj.doNumber) {
+      finalObj.suratJalanNumber = finalObj.doNumber;
+    }
+
+    finalObj._sheetRowIndex = i - 1;
+    results.push(finalObj);
   }
   return results;
 }
@@ -429,15 +517,42 @@ function upsertSingleRecord(ss, sheetName, record) {
   var rowValues = mapRecordToRow(cleanRec, headers);
 
   var lastRow = sheet.getLastRow();
+  var lastCol = Math.max(sheet.getLastColumn(), headers.length);
   if (lastRow > 1) {
-    var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-    for (var i = 0; i < ids.length; i++) {
-      if (String(ids[i][0] || '').trim() === targetId) {
+    var allRows = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+
+    // Pass 1: Match by Column A ID or embedded rawJson ID
+    for (var i = 0; i < allRows.length; i++) {
+      var row = allRows[i];
+      if (String(row[0] || '').trim() === targetId) {
         sheet.getRange(i + 2, 1, 1, headers.length).setValues([rowValues]);
         return { updated: true, mode: 'edit_single_row', id: targetId, row: i + 2 };
       }
+      for (var c = row.length - 1; c >= 0; c--) {
+        if (typeof row[c] === 'string' && row[c].indexOf('"id"') !== -1) {
+          try {
+            var parsed = JSON.parse(row[c]);
+            if (parsed && String(parsed.id || '').trim() === targetId) {
+              sheet.getRange(i + 2, 1, 1, headers.length).setValues([rowValues]);
+              return { updated: true, mode: 'edit_single_row_json', id: targetId, row: i + 2 };
+            }
+          } catch (ignore) {}
+        }
+      }
+    }
+
+    // Pass 2: Match fallback row index ID (e.g. VEH-ROW-1 or _sheetRowIndex) for legacy rows without ID
+    var rowMatch = targetId.match(/ROW-(\d+)/i);
+    var fallbackIdx = rowMatch ? (parseInt(rowMatch[1], 10) - 1) : (typeof record._sheetRowIndex === 'number' ? record._sheetRowIndex : -1);
+    if (fallbackIdx >= 0 && fallbackIdx < allRows.length) {
+      var existingColA = String(allRows[fallbackIdx][0] || '').trim();
+      if (!existingColA || existingColA === targetId || existingColA.indexOf('ROW-') !== -1) {
+        sheet.getRange(fallbackIdx + 2, 1, 1, headers.length).setValues([rowValues]);
+        return { updated: true, mode: 'edit_single_row_index', id: targetId, row: fallbackIdx + 2 };
+      }
     }
   }
+
   sheet.getRange(lastRow + 1, 1, 1, headers.length).setValues([rowValues]);
   return { updated: true, mode: 'insert_single_row', id: targetId, row: lastRow + 1 };
 }
@@ -445,26 +560,65 @@ function upsertSingleRecord(ss, sheetName, record) {
 /**
  * Fokus Hapus 1 Data Terpilih Saja Berdasarkan ID Unik (Tidak menyentuh baris lain)
  */
-function deleteRowById(ss, sheetName, id) {
-  var targetId = String(id || '').trim();
-  if (!targetId) return { deleted: false, reason: 'ID tidak valid' };
+function deleteRowById(ss, sheetName, idOrPayload) {
+  var targetId = '';
+  var targetRowIndex = -1;
+  if (idOrPayload && typeof idOrPayload === 'object') {
+    targetId = String(idOrPayload.id || '').trim();
+    if (typeof idOrPayload.rowIndex === 'number') {
+      targetRowIndex = idOrPayload.rowIndex;
+    } else if (typeof idOrPayload._sheetRowIndex === 'number') {
+      targetRowIndex = idOrPayload._sheetRowIndex;
+    }
+  } else {
+    targetId = String(idOrPayload || '').trim();
+  }
+
+  if (!targetId && targetRowIndex < 0) return { deleted: false, reason: 'ID tidak valid' };
   var sheet = ss.getSheetByName(sheetName);
   if (!sheet || sheet.getLastRow() <= 1) return { deleted: false, reason: 'Sheet belum memiliki data' };
 
   var lastRow = sheet.getLastRow();
-  var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-  for (var i = 0; i < ids.length; i++) {
-    if (String(ids[i][0] || '').trim() === targetId) {
-      sheet.deleteRow(i + 2);
-      return { deleted: true, mode: 'delete_single_row', id: targetId, row: i + 2 };
+  var lastCol = Math.max(sheet.getLastColumn(), 1);
+  var allRows = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+
+  // Pass 1: Match by Column A ID or embedded rawJson ID
+  if (targetId) {
+    for (var i = 0; i < allRows.length; i++) {
+      var row = allRows[i];
+      if (String(row[0] || '').trim() === targetId) {
+        sheet.deleteRow(i + 2);
+        return { deleted: true, mode: 'delete_single_row', id: targetId, row: i + 2 };
+      }
+      for (var c = row.length - 1; c >= 0; c--) {
+        if (typeof row[c] === 'string' && row[c].indexOf('"id"') !== -1) {
+          try {
+            var parsed = JSON.parse(row[c]);
+            if (parsed && String(parsed.id || '').trim() === targetId) {
+              sheet.deleteRow(i + 2);
+              return { deleted: true, mode: 'delete_single_row_json', id: targetId, row: i + 2 };
+            }
+          } catch (ignore) {}
+        }
+      }
     }
   }
+
+  // Pass 2: Match fallback row index ID (e.g. VEH-ROW-1 or rowIndex) for legacy rows without ID in Column A
+  var rowMatch = targetId ? targetId.match(/ROW-(\d+)/i) : null;
+  var fallbackIdx = rowMatch ? (parseInt(rowMatch[1], 10) - 1) : targetRowIndex;
+  if (fallbackIdx >= 0 && fallbackIdx < allRows.length) {
+    sheet.deleteRow(fallbackIdx + 2);
+    return { deleted: true, mode: 'delete_single_row_index', id: targetId, row: fallbackIdx + 2 };
+  }
+
   return { deleted: false, id: targetId, reason: 'ID tidak ditemukan' };
 }
 
 function sanitizeRecordForDatabase(record) {
   if (!record || typeof record !== 'object') return {};
   var copy = JSON.parse(JSON.stringify(record));
+  delete copy._sheetRowIndex;
   var heavyFields = ['attachmentDataUrl', 'receiptDataUrl', 'receiptProofUrl', 'photoUrl', 'ktpPhotoUrl', 'simPhotoUrl', 'proofImage'];
 
   for (var i = 0; i < heavyFields.length; i++) {
@@ -485,6 +639,9 @@ function mapRecordToRow(record, headers) {
       row.push(jsonStr.length > 48000 ? jsonStr.substring(0, 48000) : jsonStr);
     } else if (h === 'allowedModulesJson') {
       row.push(JSON.stringify(record.allowedTabs || record.allowedModules || []));
+    } else if (h === 'ownerCompany' || h === 'companyName') {
+      var compVal = record.ownerCompany || record.companyName || record.purchasedByCompany || record.sourceCompanyName || '';
+      row.push(compVal);
     } else {
       var val = record[h];
       row.push(val !== undefined && val !== null ? val : '');
@@ -519,6 +676,18 @@ function getOrCreateSheetWithSchema(ss, sheetName, headers) {
       .setFontColor('#ffffff');
     sheet.setFrozenRows(1);
     compactSheetCells(sheet, 15, headers.length);
+  } else {
+    // Auto-heal Row 1 headers if rawJson is missing or header count changed
+    var lastCol = Math.max(sheet.getLastColumn(), 1);
+    var currentHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    if (currentHeaders.indexOf('rawJson') === -1 || currentHeaders.length < headers.length) {
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      sheet.getRange(1, 1, 1, headers.length)
+        .setFontWeight('bold')
+        .setBackground('#0f172a')
+        .setFontColor('#ffffff');
+      sheet.setFrozenRows(1);
+    }
   }
   return sheet;
 }

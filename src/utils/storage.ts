@@ -94,9 +94,131 @@ const STORAGE_KEYS = {
   SPAREPART_MOVEMENTS: 'fleetops_sparepart_movements_v1'
 };
 
-export function stripDummyRecords<T>(items: T[]): T[] {
+const FIELD_ALIAS_MAP: Record<string, string[]> = {
+  id: ['id', 'iddata', 'idkendaraan', 'idrecord', 'kodeid', 'rowid', '_id'],
+  nopol: ['nopol', 'nopoli', 'nopolisi', 'nomorpolisi', 'platenumber', 'plat', 'noplat', 'unit'],
+  brand: ['brand', 'merk', 'merek', 'merktipe', 'merkkendaraan'],
+  model: ['model', 'seri', 'varian'],
+  type: ['type', 'tipe', 'jenis', 'jenisarmada', 'jeniskendaraan'],
+  year: ['year', 'tahun', 'tahunrakitan'],
+  ownerCompany: ['ownercompany', 'companyname', 'perusahaan', 'pemilik', 'perusahaanaset', 'pt'],
+  companyName: ['companyname', 'ownercompany', 'perusahaan', 'namaperusahaan', 'pt'],
+  assignedDriver: ['assigneddriver', 'drivername', 'supir', 'pengemudi', 'pengemudiutama', 'namasupir'],
+  driverName: ['drivername', 'assigneddriver', 'supir', 'pengemudi', 'namasupir', 'namadriver'],
+  currentOdometer: ['currentodometer', 'odometer', 'lastodometer', 'km', 'odometerterkini'],
+  odometer: ['odometer', 'currentodometer', 'lastodometer', 'km'],
+  capacityTon: ['capacityton', 'kapasitas', 'tonase', 'capacity'],
+  status: ['status', 'statusoperasi', 'statusdata'],
+  stnk1YearDate: ['stnk1yeardate', 'stnk1thn', 'pajakstnk1thn', 'stnk'],
+  stnk5YearDate: ['stnk5yeardate', 'stnk5thn', 'plat5thn'],
+  kirDate: ['kirdate', 'kir', 'ujikir', 'ujikirdishub'],
+  documentType: ['documenttype', 'taxtype', 'jenispajak', 'jenisdokumen'],
+  dueDate: ['duedate', 'jatuhtempo', 'tgljatuhtempo'],
+  lastPaymentDate: ['lastpaymentdate', 'paiddate', 'tanggalbayar', 'tglbayar'],
+  amount: ['amount', 'estimatedcost', 'totalcost', 'totalamount', 'nominal', 'biaya', 'cost'],
+  volumeLiters: ['volumeliters', 'liters', 'liter', 'volume'],
+  fuelStation: ['fuelstation', 'stationname', 'spbu'],
+  equipmentName: ['equipmentname', 'itemname', 'namaalat', 'namabarang'],
+  quantity: ['quantity', 'qty', 'jumlah'],
+  suratJalanNumber: ['suratjalannumber', 'donumber', 'nosuratjalan', 'nodo'],
+  tripNumber: ['tripnumber', 'tripcode', 'kodetrip'],
+  departureDate: ['departuredate', 'date', 'tanggal', 'tglberangkat'],
+  originLocation: ['originlocation', 'origin', 'asal', 'lokasimuatan'],
+  destinationLocation: ['destinationlocation', 'destination', 'tujuan', 'lokasibongkar'],
+  totalPocketDisbursed: ['totalpocketdisbursed', 'totalpocketmoney', 'totalgiven', 'uangsaku'],
+  actualTripExpense: ['actualtripexpense', 'realizedexpense', 'actualexpense', 'realisasi'],
+  totalGiven: ['totalgiven', 'totalpocketmoney', 'amount', 'nominalcair'],
+  actualExpense: ['actualexpense', 'realizedexpense', 'realisasi'],
+  partCode: ['partcode', 'kodepart', 'kodesparepart'],
+  partName: ['partname', 'namapart', 'namasparepart'],
+  stockQty: ['stockqty', 'stok', 'qty'],
+  name: ['name', 'fullname', 'nama', 'namalengkap']
+};
+
+export function normalizeSingleRecord(raw: any, index: number, prefix = 'REC'): any {
+  if (!raw || typeof raw !== 'object') return null;
+
+  let merged: Record<string, any> = { ...raw };
+
+  // 1. Check if any property value in the row is a full JSON object string (e.g., rawJson under any header name)
+  for (const val of Object.values(raw)) {
+    if (typeof val === 'string') {
+      const trimmed = val.trim();
+      if (trimmed.length > 10 && trimmed.startsWith('{') && trimmed.endsWith('}')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            merged = { ...merged, ...parsed };
+          }
+        } catch {
+          // ignore non-json
+        }
+      }
+    }
+  }
+
+  // 2. Build case-insensitive & punctuation-stripped key lookup
+  const normalizedLookup: Record<string, any> = {};
+  for (const [k, v] of Object.entries(merged)) {
+    if (v !== undefined && v !== null && v !== '') {
+      const cleanKey = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (normalizedLookup[cleanKey] === undefined) {
+        normalizedLookup[cleanKey] = v;
+      }
+    }
+  }
+
+  // 3. Apply canonical field aliases if canonical field is missing or empty
+  for (const [canonicalField, aliases] of Object.entries(FIELD_ALIAS_MAP)) {
+    const currentVal = merged[canonicalField];
+    if (currentVal === undefined || currentVal === null || currentVal === '') {
+      for (const alias of aliases) {
+        if (normalizedLookup[alias] !== undefined && normalizedLookup[alias] !== '') {
+          merged[canonicalField] = normalizedLookup[alias];
+          break;
+        }
+      }
+    }
+  }
+
+  // 4. Guarantee a non-empty ID
+  const rawId = String(merged.id ?? '').trim();
+  if (!rawId || rawId === 'undefined' || rawId === 'null') {
+    merged.id = `${prefix}-ROW-${index + 1}`;
+  } else {
+    merged.id = rawId;
+  }
+
+  // Preserve 0-based sheet row index for fallback sheet targeting
+  if (typeof merged._sheetRowIndex !== 'number') {
+    merged._sheetRowIndex = index;
+  }
+
+  return merged;
+}
+
+export function stripDummyRecords<T>(items: T[], prefix = 'REC'): T[] {
   if (!Array.isArray(items)) return [];
-  return items.filter((item: any) => Boolean(item && typeof item === 'object'));
+  const seenIds = new Set<string>();
+  const result: T[] = [];
+
+  items.forEach((rawItem: any, idx: number) => {
+    const norm = normalizeSingleRecord(rawItem, idx, prefix);
+    if (!norm) return;
+
+    let finalId = String(norm.id).trim();
+    if (!finalId || seenIds.has(finalId)) {
+      finalId = `${prefix}-ROW-${idx + 1}`;
+      if (seenIds.has(finalId)) {
+        finalId = `${prefix}-ROW-${idx + 1}-${Math.random().toString(36).slice(2, 6)}`;
+      }
+      norm.id = finalId;
+    }
+    seenIds.add(finalId);
+    result.push(norm as T);
+  });
+
+  return result;
 }
 
 function readStoredArray<T>(key: string, fallback: T[]): T[] {
@@ -105,7 +227,9 @@ function readStoredArray<T>(key: string, fallback: T[]): T[] {
     if (!raw) return fallback;
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      return parsed.filter((item: any) => Boolean(item && typeof item === 'object'));
+      const prefix = key.replace('fleetops_', '').replace('_v1', '').slice(0, 4).toUpperCase() || 'REC';
+      const normalized = stripDummyRecords<T>(parsed, prefix);
+      return normalized;
     }
     localStorage.setItem(key, JSON.stringify(fallback));
     return fallback;
@@ -116,7 +240,9 @@ function readStoredArray<T>(key: string, fallback: T[]): T[] {
 
 function writeStoredArray<T>(key: string, data: T[]) {
   if (!Array.isArray(data)) return;
-  localStorage.setItem(key, JSON.stringify(data));
+  const prefix = key.replace('fleetops_', '').replace('_v1', '').slice(0, 4).toUpperCase() || 'REC';
+  const normalized = stripDummyRecords<T>(data, prefix);
+  localStorage.setItem(key, JSON.stringify(normalized));
 }
 
 import { normalizeAllowedModules } from './permissions';
@@ -715,7 +841,7 @@ export const fetchAppDataFromGAS = async (
               message: 'Gagal membaca Google Spreadsheet: ' + String(err)
             });
           })
-          .runClientApi({ action: 'getAllData' });
+          .runClientApi({ action: 'getAllData', forceRefresh: true });
       } catch (e) {
         resolve({ success: false, message: String(e) });
       }
@@ -727,8 +853,9 @@ export const fetchAppDataFromGAS = async (
   }
 
   try {
-    const url = webAppUrl.includes('?') ? `${webAppUrl}&action=getAllData` : `${webAppUrl}?action=getAllData`;
-    const response = await fetch(url);
+    const sep = webAppUrl.includes('?') ? '&' : '?';
+    const url = `${webAppUrl}${sep}action=getAllData&nocache=1&_t=${Date.now()}`;
+    const response = await fetch(url, { cache: 'no-store' });
     const result = await response.json();
     if (result && result.status === 'success' && result.data) {
       return {

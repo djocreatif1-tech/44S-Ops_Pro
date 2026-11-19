@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Vehicle,
   TaxRecord,
@@ -179,79 +179,112 @@ export function App() {
   const [isNotifPanelOpen, setIsNotifPanelOpen] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
+  const pendingMutationsRef = useRef<number>(0);
 
-  // Real-time synchronization worker (Google Spreadsheet as Primary Clean Database - Tanpa Data Dummy)
+  // Real-time synchronization worker (Google Spreadsheet as Primary Clean Database)
   const pullFromGas = async (silent = true) => {
+    // Prevent background polling from overwriting optimistic state while an edit/delete is in flight
+    if (silent && pendingMutationsRef.current > 0) return;
+
     const cfg = loadGoogleSheetsConfig();
     const canSync = isRunningInGAS() || (cfg.webAppUrl && cfg.webAppUrl.startsWith('http'));
     if (!canSync) return;
     if (!silent) setIsSyncing(true);
     try {
       const res = await fetchAppDataFromGAS(cfg.webAppUrl);
+      if (silent && pendingMutationsRef.current > 0) return;
+
       if (res.success && res.data) {
         const d = res.data;
-        const cleanCloudArray = <T,>(arr: unknown): T[] => {
+        const cleanCloudArray = <T,>(arr: unknown, prefix = 'REC'): T[] => {
           if (!Array.isArray(arr)) return [];
-          return stripDummyRecords<T>(arr as T[]);
+          return stripDummyRecords<T>(arr as T[], prefix);
         };
 
         if (Array.isArray(d.vehicles)) {
-          const cleanVehicles = cleanCloudArray<Vehicle>(d.vehicles).map((v: any) => ({
+          const cleanVehicles = cleanCloudArray<Vehicle>(d.vehicles, 'VH').map((v: any, idx: number) => ({
             ...v,
+            id: String(v.id || `VH-ROW-${idx + 1}`).trim(),
             nopol: v.nopol || v.plateNumber || '-',
             brand: v.brand || '-',
-            type: v.type || v.model || 'Truck',
+            model: v.model || '',
+            type: v.type || v.model || 'Dump Truck',
             year: Number(v.year) || new Date().getFullYear(),
-            currentOdometer: Number(v.currentOdometer ?? v.lastOdometer ?? 0),
+            fuelType: v.fuelType || 'Bio Solar',
+            ownerCompany: v.ownerCompany || v.companyName || 'PT Transindo Logistik',
+            currentOdometer: Number(v.currentOdometer ?? v.odometer ?? v.lastOdometer ?? 0),
             assignedDriver: v.assignedDriver || v.driverName || '-',
             status: v.status || 'active',
+            stnk1YearDate: v.stnk1YearDate || '',
+            stnk5YearDate: v.stnk5YearDate || '',
+            kirDate: v.kirDate || '',
+            targetKmPerLiter: Number(v.targetKmPerLiter) || 5.0,
             capacityTon: Number(v.capacityTon) || 10
           }));
           setVehicles(cleanVehicles);
           saveStoredData({ vehicles: cleanVehicles });
         }
         if (Array.isArray(d.taxes)) {
-          const cleanTaxes = cleanCloudArray<TaxRecord>(d.taxes);
+          const cleanTaxes = cleanCloudArray<TaxRecord>(d.taxes, 'TAX').map((t: any, idx: number) => ({
+            ...t,
+            id: String(t.id || `TAX-ROW-${idx + 1}`).trim(),
+            nopol: t.nopol || '-',
+            documentType: t.documentType || t.taxType || 'Pajak Tahunan STNK',
+            dueDate: t.dueDate || '',
+            amount: Number(t.amount ?? t.estimatedCost ?? 0),
+            status: t.status || 'due_soon'
+          }));
           setTaxes(cleanTaxes);
           saveStoredData({ taxes: cleanTaxes });
         }
         if (Array.isArray(d.fuelLogs)) {
-          const cleanFuel = cleanCloudArray<FuelLog>(d.fuelLogs);
+          const cleanFuel = cleanCloudArray<FuelLog>(d.fuelLogs, 'BBM').map((f: any, idx: number) => ({
+            ...f,
+            id: String(f.id || `BBM-ROW-${idx + 1}`).trim(),
+            nopol: f.nopol || '-',
+            driverName: f.driverName || '-',
+            volumeLiters: Number(f.volumeLiters ?? f.liters ?? 0),
+            pricePerLiter: Number(f.pricePerLiter ?? 0),
+            totalCost: Number(f.totalCost ?? 0),
+            odometer: Number(f.odometer ?? 0),
+            fuelStation: f.fuelStation || f.stationName || 'SPBU'
+          }));
           setFuelLogs(cleanFuel);
           saveStoredData({ fuelLogs: cleanFuel });
         }
         if (Array.isArray(d.finances)) {
-          const cleanFinances = cleanCloudArray<OperationalFinance>(d.finances);
+          const cleanFinances = cleanCloudArray<OperationalFinance>(d.finances, 'FIN');
           setFinances(cleanFinances);
           saveStoredData({ finances: cleanFinances });
         }
         if (Array.isArray(d.accounts)) {
-          const cleanAccounts = cleanCloudArray<FinancialAccount>(d.accounts);
+          const cleanAccounts = cleanCloudArray<FinancialAccount>(d.accounts, 'ACC');
           setAccounts(cleanAccounts);
           saveStoredData({ accounts: cleanAccounts });
         }
         if (Array.isArray((d as any).companyDeposits)) {
-          const cleanDeposits = cleanCloudArray<CompanyDeposit>((d as any).companyDeposits);
+          const cleanDeposits = cleanCloudArray<CompanyDeposit>((d as any).companyDeposits, 'DEP');
           setCompanyDeposits(cleanDeposits);
           saveStoredData({ companyDeposits: cleanDeposits });
         }
         if (Array.isArray(d.timesheets)) {
-          const cleanTimesheets = cleanCloudArray<DriverTimesheet>(d.timesheets);
+          const cleanTimesheets = cleanCloudArray<DriverTimesheet>(d.timesheets, 'TS');
           setTimesheets(cleanTimesheets);
           saveStoredData({ timesheets: cleanTimesheets });
         }
         if (Array.isArray(d.maintenance)) {
-          const cleanMaintenance = cleanCloudArray<MaintenanceRecord>(d.maintenance);
+          const cleanMaintenance = cleanCloudArray<MaintenanceRecord>(d.maintenance, 'MNT');
           setMaintenance(cleanMaintenance);
           saveStoredData({ maintenance: cleanMaintenance });
         }
         if (Array.isArray(d.drivers)) {
-          const cleanDrivers = cleanCloudArray<Driver>(d.drivers).map((dr: any) => ({
+          const cleanDrivers = cleanCloudArray<Driver>(d.drivers, 'DRV').map((dr: any, idx: number) => ({
             ...dr,
+            id: String(dr.id || `DRV-ROW-${idx + 1}`).trim(),
             name: dr.name || dr.fullName || '-',
             phone: dr.phone || '-',
-            simClass: dr.simClass || dr.licenseType || 'B1',
-            simExpiry: dr.simExpiry || dr.licenseExpiry || '-',
+            simType: dr.simType || dr.simClass || dr.licenseType || 'B1 Umum',
+            simExpiryDate: dr.simExpiryDate || dr.simExpiry || dr.licenseExpiry || '-',
             assignedVehicle: dr.assignedVehicle || dr.assignedPlateNumber || '-',
             status: dr.status || 'active'
           }));
@@ -259,30 +292,35 @@ export function App() {
           saveStoredData({ drivers: cleanDrivers });
         }
         if (Array.isArray((d as any).pocketFlows)) {
-          const cleanPocket = cleanCloudArray<DriverPocketCashFlow>((d as any).pocketFlows);
+          const cleanPocket = cleanCloudArray<DriverPocketCashFlow>((d as any).pocketFlows, 'PKT');
           setPocketFlows(cleanPocket);
           saveStoredData({ pocketFlows: cleanPocket });
         }
         const eqList = (d as any).equipmentFlows || (d as any).equipmentList;
         if (Array.isArray(eqList)) {
-          const cleanEq = cleanCloudArray<EquipmentCashFlow>(eqList);
+          const cleanEq = cleanCloudArray<EquipmentCashFlow>(eqList, 'EQP');
           setEquipmentList(cleanEq);
           saveStoredData({ equipment: cleanEq });
         }
         if (Array.isArray((d as any).tripSheets)) {
-          const cleanTrips = cleanCloudArray<TripSheet>((d as any).tripSheets);
+          const cleanTrips = cleanCloudArray<TripSheet>((d as any).tripSheets, 'TRP');
           setTripSheets(cleanTrips);
           saveStoredData({ tripSheets: cleanTrips });
         }
         if (Array.isArray((d as any).sparepartInventory)) {
-          const cleanParts = cleanCloudArray<SparepartInventoryItem>((d as any).sparepartInventory);
+          const cleanParts = cleanCloudArray<SparepartInventoryItem>((d as any).sparepartInventory, 'PRT');
           setSparepartInventory(cleanParts);
           saveStoredData({ sparepartInventory: cleanParts });
         }
         if (Array.isArray((d as any).sparepartMovements)) {
-          const cleanMovs = cleanCloudArray<SparepartStockMovement>((d as any).sparepartMovements);
+          const cleanMovs = cleanCloudArray<SparepartStockMovement>((d as any).sparepartMovements, 'MOV');
           setSparepartMovements(cleanMovs);
           saveStoredData({ sparepartMovements: cleanMovs });
+        }
+        if (Array.isArray((d as any).users) && (d as any).users.length > 0) {
+          const cleanUsers = cleanCloudArray<UserAccount>((d as any).users, 'USR');
+          setUsers(cleanUsers);
+          saveStoredData({ users: cleanUsers });
         }
 
         if (!silent) showToast('Data disinkronkan real-time dari database utama Google Sheets!');
@@ -644,12 +682,18 @@ export function App() {
 
   // Push to Google Sheets if configured or running inside GAS
   const pushToGas = async (action: string, data: unknown) => {
-    const targetUrl = gasConfig.webAppUrl ? gasConfig.webAppUrl.trim() : '';
+    const cfg = loadGoogleSheetsConfig();
+    const targetUrl = (gasConfig.webAppUrl || cfg.webAppUrl || '').trim();
     if (!isRunningInGAS() && (!targetUrl || !targetUrl.startsWith('http'))) return;
+    pendingMutationsRef.current += 1;
     try {
       await syncToGoogleAppsScript(targetUrl, action, data);
     } catch {
       // ignore
+    } finally {
+      setTimeout(() => {
+        pendingMutationsRef.current = Math.max(0, pendingMutationsRef.current - 1);
+      }, 1500);
     }
   };
 
@@ -701,7 +745,8 @@ export function App() {
   const handleDeleteVehicle = (id: string) => {
     const targetId = String(id || '').trim();
     if (!targetId) return;
-    const target = vehicles.find(v => String(v.id).trim() === targetId);
+    const targetIndex = vehicles.findIndex(v => String(v.id).trim() === targetId);
+    const target = targetIndex >= 0 ? vehicles[targetIndex] : undefined;
     const updated = vehicles.filter(v => String(v.id).trim() !== targetId);
     setVehicles(updated);
     createActivityLog(
@@ -715,7 +760,10 @@ export function App() {
       'danger'
     );
     persistAll({ vehicles: updated });
-    pushToGas('deleteVehicle', { id: targetId });
+    pushToGas('deleteVehicle', {
+      id: targetId,
+      rowIndex: typeof (target as any)?._sheetRowIndex === 'number' ? (target as any)._sheetRowIndex : targetIndex
+    });
     showToast(`Kendaraan ${target?.nopol || targetId} berhasil dihapus`, 'info');
   };
 
@@ -848,8 +896,17 @@ export function App() {
       'success'
     );
 
+    const updatedTaxObj = updatedTaxes.find(t => t.id === taxId);
+    const updatedAccObj = targetAccountId ? updatedAccounts.find(a => a.id === targetAccountId) : undefined;
     persistAll({ taxes: updatedTaxes, finances: updatedFinances, accounts: updatedAccounts });
-    pushToGas('payTax', { taxId, paymentDate, amount: paidAmount, newFinance });
+    pushToGas('payTax', {
+      taxId,
+      paymentDate,
+      amount: paidAmount,
+      updatedTax: updatedTaxObj,
+      newFinance,
+      updatedAccount: updatedAccObj
+    });
     showToast(`Pajak ${tax.nopol} berhasil dibayarkan dan dicatat ke arus kas!`);
   };
 
@@ -914,6 +971,13 @@ export function App() {
 
     persistAll({ vehicles: updatedVehicles, fuelLogs: updatedFuel, finances: updatedFinances, accounts: updatedAccounts });
     pushToGas('addFuelLog', f);
+    pushToGas('addFinance', newFinance);
+    const updatedVeh = updatedVehicles.find(v => v.id === f.vehicleId || v.nopol === f.nopol);
+    if (updatedVeh) pushToGas('updateVehicle', updatedVeh);
+    if (f.accountId) {
+      const updatedAcc = updatedAccounts.find(a => a.id === f.accountId);
+      if (updatedAcc) pushToGas('updateAccount', updatedAcc);
+    }
     showToast(`Pengisian BBM solar ${f.nopol} (${f.volumeLiters}L) tersimpan & kas terupdate!`);
   };
 
@@ -1129,8 +1193,10 @@ export function App() {
   };
 
   const handleUpdateCompanyDeposit = (dep: CompanyDeposit) => {
+    if (!dep?.id) return;
+    const targetId = String(dep.id).trim();
     const safeDeposits = asArray<CompanyDeposit>(companyDeposits);
-    const updated = safeDeposits.map(c => (c.id === dep.id ? dep : c));
+    const updated = safeDeposits.map(c => (String(c.id).trim() === targetId ? dep : c));
     setCompanyDeposits(updated);
     createActivityLog(
       'finance',
@@ -1148,22 +1214,24 @@ export function App() {
   };
 
   const handleDeleteCompanyDeposit = (id: string) => {
+    const targetId = String(id || '').trim();
+    if (!targetId) return;
     const safeDeposits = asArray<CompanyDeposit>(companyDeposits);
-    const target = safeDeposits.find(c => c.id === id);
-    const updated = safeDeposits.filter(c => c.id !== id);
+    const target = safeDeposits.find(c => String(c.id).trim() === targetId);
+    const updated = safeDeposits.filter(c => String(c.id).trim() !== targetId);
     setCompanyDeposits(updated);
     createActivityLog(
       'finance',
       'delete',
       'Hapus Rekanan Deposit',
-      `Penghapusan akun rekanan deposit: ${target?.companyName || id}.`,
-      id,
-      target?.companyName || id,
+      `Penghapusan akun rekanan deposit: ${target?.companyName || targetId}.`,
+      targetId,
+      target?.companyName || targetId,
       undefined,
       'danger'
     );
     persistAll({ companyDeposits: updated });
-    pushToGas('deleteCompanyDeposit', { id });
+    pushToGas('deleteCompanyDeposit', { id: targetId });
     showToast('Rekanan deposit dihapus', 'info');
   };
 
@@ -1245,8 +1313,19 @@ export function App() {
       'success'
     );
 
+    const updatedDepObj = updatedDeposits.find(c => c.id === companyId);
+    const updatedAccObj = updatedAccounts.find(a => a.id === accountId);
     persistAll({ finances: updatedFinances, accounts: updatedAccounts, companyDeposits: updatedDeposits });
-    pushToGas('topUpCompanyDeposit', { companyId, amount, paymentMethod, accountId, notes, topUpTx });
+    pushToGas('topUpCompanyDeposit', {
+      companyId,
+      amount,
+      paymentMethod,
+      accountId,
+      notes,
+      updatedDeposit: updatedDepObj,
+      topUpTx,
+      updatedAccount: updatedAccObj
+    });
     showToast(`Top-Up ${formatRupiah(amount)} untuk ${targetComp?.companyName} berhasil diproses!`);
   };
 
@@ -1270,7 +1349,9 @@ export function App() {
   };
 
   const handleUpdateAccount = (acc: FinancialAccount) => {
-    const updatedAcc = accounts.map(a => (a.id === acc.id ? acc : a));
+    if (!acc?.id) return;
+    const targetId = String(acc.id).trim();
+    const updatedAcc = accounts.map(a => (String(a.id).trim() === targetId ? acc : a));
     setAccounts(updatedAcc);
     createActivityLog(
       'finance',
@@ -1288,21 +1369,23 @@ export function App() {
   };
 
   const handleDeleteAccount = (id: string) => {
-    const target = accounts.find(a => a.id === id);
-    const updatedAcc = accounts.filter(a => a.id !== id);
+    const targetId = String(id || '').trim();
+    if (!targetId) return;
+    const target = accounts.find(a => String(a.id).trim() === targetId);
+    const updatedAcc = accounts.filter(a => String(a.id).trim() !== targetId);
     setAccounts(updatedAcc);
     createActivityLog(
       'finance',
       'delete',
       'Hapus Rekening Kas/Bank',
-      `Penghapusan akun rekening pembukuan ${target?.accountName || id}.`,
-      id,
-      target?.accountName || id,
+      `Penghapusan akun rekening pembukuan ${target?.accountName || targetId}.`,
+      targetId,
+      target?.accountName || targetId,
       undefined,
       'danger'
     );
     persistAll({ accounts: updatedAcc });
-    pushToGas('deleteAccount', { id });
+    pushToGas('deleteAccount', { id: targetId });
     showToast('Akun kas/bank berhasil dihapus', 'info');
   };
 
@@ -2723,7 +2806,9 @@ export function App() {
   };
 
   const handleUpdateMaintenance = (m: MaintenanceRecord) => {
-    const updated = maintenance.map(item => (item.id === m.id ? m : item));
+    if (!m?.id) return;
+    const targetId = String(m.id).trim();
+    const updated = maintenance.map(item => (String(item.id).trim() === targetId ? m : item));
     setMaintenance(updated);
     createActivityLog(
       'maintenance',
@@ -2741,21 +2826,23 @@ export function App() {
   };
 
   const handleDeleteMaintenance = (id: string) => {
-    const target = maintenance.find(m => m.id === id);
-    const updated = maintenance.filter(m => m.id !== id);
+    const targetId = String(id || '').trim();
+    if (!targetId) return;
+    const target = maintenance.find(m => String(m.id).trim() === targetId);
+    const updated = maintenance.filter(m => String(m.id).trim() !== targetId);
     setMaintenance(updated);
     createActivityLog(
       'maintenance',
       'delete',
       'Hapus SPK Perawatan',
-      `Penghapusan data servis bengkel ${target?.nopol || id}.`,
-      id,
-      target?.nopol || id,
+      `Penghapusan data servis bengkel ${target?.nopol || targetId}.`,
+      targetId,
+      target?.nopol || targetId,
       undefined,
       'danger'
     );
     persistAll({ maintenance: updated });
-    pushToGas('deleteMaintenance', { id });
+    pushToGas('deleteMaintenance', { id: targetId });
     showToast('Data perawatan dihapus', 'info');
   };
 
@@ -2779,7 +2866,9 @@ export function App() {
   };
 
   const handleUpdateDriver = (d: Driver) => {
-    const updated = drivers.map(item => (item.id === d.id ? d : item));
+    if (!d?.id) return;
+    const targetId = String(d.id).trim();
+    const updated = drivers.map(item => (String(item.id).trim() === targetId ? d : item));
     setDrivers(updated);
     createActivityLog(
       'driver',
@@ -2797,21 +2886,23 @@ export function App() {
   };
 
   const handleDeleteDriver = (id: string) => {
-    const target = drivers.find(item => item.id === id);
-    const updated = drivers.filter(item => item.id !== id);
+    const targetId = String(id || '').trim();
+    if (!targetId) return;
+    const target = drivers.find(item => String(item.id).trim() === targetId);
+    const updated = drivers.filter(item => String(item.id).trim() !== targetId);
     setDrivers(updated);
     createActivityLog(
       'driver',
       'delete',
       'Hapus Profil Supir',
-      `Penghapusan profil pengemudi ${target?.name || id} dari sistem.`,
-      id,
-      target?.name || id,
+      `Penghapusan profil pengemudi ${target?.name || targetId} dari sistem.`,
+      targetId,
+      target?.name || targetId,
       undefined,
       'danger'
     );
     persistAll({ drivers: updated });
-    pushToGas('deleteDriver', { id });
+    pushToGas('deleteDriver', { id: targetId });
     showToast('Data supir dihapus', 'info');
   };
 
