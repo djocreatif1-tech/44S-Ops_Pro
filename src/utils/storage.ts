@@ -95,36 +95,47 @@ const STORAGE_KEYS = {
 };
 
 const FIELD_ALIAS_MAP: Record<string, string[]> = {
-  id: ['id', 'iddata', 'idkendaraan', 'idrecord', 'kodeid', 'rowid', '_id'],
-  nopol: ['nopol', 'nopoli', 'nopolisi', 'nomorpolisi', 'platenumber', 'plat', 'noplat', 'unit'],
-  brand: ['brand', 'merk', 'merek', 'merktipe', 'merkkendaraan'],
-  model: ['model', 'seri', 'varian'],
-  type: ['type', 'tipe', 'jenis', 'jenisarmada', 'jeniskendaraan'],
-  year: ['year', 'tahun', 'tahunrakitan'],
-  ownerCompany: ['ownercompany', 'companyname', 'perusahaan', 'pemilik', 'perusahaanaset', 'pt'],
-  companyName: ['companyname', 'ownercompany', 'perusahaan', 'namaperusahaan', 'pt'],
-  assignedDriver: ['assigneddriver', 'drivername', 'supir', 'pengemudi', 'pengemudiutama', 'namasupir'],
-  driverName: ['drivername', 'assigneddriver', 'supir', 'pengemudi', 'namasupir', 'namadriver'],
-  currentOdometer: ['currentodometer', 'odometer', 'lastodometer', 'km', 'odometerterkini'],
-  odometer: ['odometer', 'currentodometer', 'lastodometer', 'km'],
-  capacityTon: ['capacityton', 'kapasitas', 'tonase', 'capacity'],
-  status: ['status', 'statusoperasi', 'statusdata'],
-  stnk1YearDate: ['stnk1yeardate', 'stnk1thn', 'pajakstnk1thn', 'stnk'],
-  stnk5YearDate: ['stnk5yeardate', 'stnk5thn', 'plat5thn'],
-  kirDate: ['kirdate', 'kir', 'ujikir', 'ujikirdishub'],
-  documentType: ['documenttype', 'taxtype', 'jenispajak', 'jenisdokumen'],
-  dueDate: ['duedate', 'jatuhtempo', 'tgljatuhtempo'],
-  lastPaymentDate: ['lastpaymentdate', 'paiddate', 'tanggalbayar', 'tglbayar'],
-  amount: ['amount', 'estimatedcost', 'totalcost', 'totalamount', 'nominal', 'biaya', 'cost'],
-  volumeLiters: ['volumeliters', 'liters', 'liter', 'volume'],
-  fuelStation: ['fuelstation', 'stationname', 'spbu'],
+  id: ['id', 'idunit', 'idpajak', 'idlog', 'idtransaksi', 'idtimesheet', 'idservis', 'idsupir', 'idakun', 'iddata', 'idkendaraan', 'idrecord', 'kodeid', 'rowid', '_id', 'no'],
+  nopol: ['nopol', 'nopolisi', 'nopoli', 'nomorpolisi', 'platenumber', 'plat', 'noplat', 'unit', 'platnomor', 'kendaraan'],
+  brand: ['brand', 'merkmodel', 'merk', 'merek', 'merktipe', 'merkkendaraan', 'pabrikan'],
+  model: ['model', 'seri', 'varian', 'tipemodel'],
+  type: ['type', 'tipekendaraan', 'tipe', 'jenis', 'jenisarmada', 'jeniskendaraan', 'kategoriarmada'],
+  year: ['year', 'tahun', 'tahunrakitan', 'tahunpembuatan', 'thn'],
+  fuelType: ['fueltype', 'bahanbakar', 'jenisbbm', 'bbm'],
+  chassisNumber: ['chassisnumber', 'norangka', 'nomorrangka', 'rangka'],
+  engineNumber: ['enginenumber', 'nomesin', 'nomormesin', 'mesin'],
+  ownerCompany: ['ownercompany', 'companyname', 'perusahaan', 'pemilik', 'perusahaanaset', 'pemilikperusahaanaset', 'pt', 'namaperusahaan'],
+  companyName: ['companyname', 'ownercompany', 'perusahaan', 'namaperusahaan', 'pt', 'pemilik'],
+  assignedDriver: ['assigneddriver', 'supirtetap', 'drivername', 'supir', 'pengemudi', 'pengemudiutama', 'namasupir'],
+  driverPhone: ['driverphone', 'nohpsupir', 'nowhatsapphp', 'nohpsupirtetap', 'teleponsupir', 'hpsupir'],
+  driverName: ['drivername', 'assigneddriver', 'supir', 'pengemudi', 'namasupir', 'namadriver', 'namalengkap'],
+  currentOdometer: ['currentodometer', 'odometerterkinikm', 'odometer', 'lastodometer', 'km', 'odometerterkini', 'odometersaatini'],
+  odometer: ['odometer', 'odometersaatini', 'currentodometer', 'lastodometer', 'km', 'odometerterkinikm'],
+  capacityTon: ['capacityton', 'kapasitaston', 'kapasitas', 'tonase', 'capacity', 'dayaangkut'],
+  targetKmPerLiter: ['targetkmperliter', 'targetkmliter', 'kmliter', 'rasio', 'targetbbm'],
+  status: ['status', 'statusoperasi', 'statusvalidasi', 'statustugas', 'statusdata'],
+  stnk1YearDate: ['stnk1yeardate', 'jatuhtempopajak1thn', 'stnk1thn', 'pajakstnk1thn', 'stnk', 'pajak1thn'],
+  stnk5YearDate: ['stnk5yeardate', 'jatuhtempoplat5thn', 'stnk5thn', 'plat5thn', 'pajak5thn'],
+  kirDate: ['kirdate', 'jatuhtempokir', 'kir', 'ujikir', 'ujikirdishub'],
+  notes: ['notes', 'catatan', 'keterangan', 'catatanservis', 'deskripsi'],
+  documentType: ['documenttype', 'jenisdokumen', 'taxtype', 'jenispajak'],
+  dueDate: ['duedate', 'tanggaljatuhtempo', 'jatuhtempo', 'tgljatuhtempo'],
+  lastPaymentDate: ['lastpaymentdate', 'tglbayarterakhir', 'paiddate', 'tanggalbayar', 'tglbayar'],
+  amount: ['amount', 'estimasibiayarp', 'jumlahrp', 'totalbiayarp', 'estimatedcost', 'totalcost', 'totalamount', 'nominal', 'biaya', 'cost'],
+  penaltyAmount: ['penaltyamount', 'dendarp', 'denda'],
+  agentOrSamsat: ['agentorsamsat', 'samsatlokasikir', 'samsat', 'lokasikir'],
+  volumeLiters: ['volumeliters', 'volumeliter', 'liters', 'liter', 'volume'],
+  pricePerLiter: ['priceperliter', 'hargaperliterrp', 'hargaperliter', 'hargabbm'],
+  totalCost: ['totalcost', 'totalbiayarp', 'totalbiaya', 'biayatotal'],
+  fuelStation: ['fuelstation', 'spbulokasi', 'stationname', 'spbu'],
+  date: ['date', 'tanggal', 'tanggalservis', 'tgl'],
   equipmentName: ['equipmentname', 'itemname', 'namaalat', 'namabarang'],
   quantity: ['quantity', 'qty', 'jumlah'],
   suratJalanNumber: ['suratjalannumber', 'donumber', 'nosuratjalan', 'nodo'],
-  tripNumber: ['tripnumber', 'tripcode', 'kodetrip'],
+  tripNumber: ['tripnumber', 'tripcode', 'kodetrip', 'kodetripdo'],
   departureDate: ['departuredate', 'date', 'tanggal', 'tglberangkat'],
-  originLocation: ['originlocation', 'origin', 'asal', 'lokasimuatan'],
-  destinationLocation: ['destinationlocation', 'destination', 'tujuan', 'lokasibongkar'],
+  originLocation: ['originlocation', 'asalorigin', 'origin', 'asal', 'lokasimuatan'],
+  destinationLocation: ['destinationlocation', 'tujuandestination', 'destination', 'tujuan', 'lokasibongkar'],
   totalPocketDisbursed: ['totalpocketdisbursed', 'totalpocketmoney', 'totalgiven', 'uangsaku'],
   actualTripExpense: ['actualtripexpense', 'realizedexpense', 'actualexpense', 'realisasi'],
   totalGiven: ['totalgiven', 'totalpocketmoney', 'amount', 'nominalcair'],
@@ -132,23 +143,56 @@ const FIELD_ALIAS_MAP: Record<string, string[]> = {
   partCode: ['partcode', 'kodepart', 'kodesparepart'],
   partName: ['partname', 'namapart', 'namasparepart'],
   stockQty: ['stockqty', 'stok', 'qty'],
-  name: ['name', 'fullname', 'nama', 'namalengkap']
+  name: ['name', 'fullname', 'nama', 'namalengkap'],
+  phone: ['phone', 'nowhatsapphp', 'nohp', 'telepon', 'whatsapp'],
+  simType: ['simtype', 'golongansim', 'simclass', 'jenissim'],
+  simExpiryDate: ['simexpirydate', 'masaberlakusim', 'simexpiry', 'expirysim'],
+  assignedVehicle: ['assignedvehicle', 'unitpegangan', 'armadapegangan']
 };
+
+const DATE_FIELDS = [
+  'stnk1YearDate',
+  'stnk5YearDate',
+  'kirDate',
+  'insuranceDate',
+  'dueDate',
+  'lastPaymentDate',
+  'date',
+  'serviceDate',
+  'nextServiceDate',
+  'departureDate',
+  'simExpiryDate'
+];
 
 export function normalizeSingleRecord(raw: any, index: number, prefix = 'REC'): any {
   if (!raw || typeof raw !== 'object') return null;
 
-  let merged: Record<string, any> = { ...raw };
+  const workingRaw: Record<string, any> = { ...raw };
+
+  // 0. Strip corrupted ghost vehicle placeholder fields from earlier un-normalized syncs
+  if (workingRaw.nopol === '-' && workingRaw.brand === '-') {
+    delete workingRaw.nopol;
+    delete workingRaw.brand;
+    if (workingRaw.type === 'Truck' || workingRaw.type === 'Dump Truck') delete workingRaw.type;
+    if (workingRaw.year === 2026) delete workingRaw.year;
+    if (workingRaw.currentOdometer === 0) delete workingRaw.currentOdometer;
+    if (workingRaw.assignedDriver === '-') delete workingRaw.assignedDriver;
+    if (workingRaw.capacityTon === 10) delete workingRaw.capacityTon;
+    if (typeof workingRaw.id === 'string' && /^(VH|VEHI|REC)-ROW-\d+/i.test(workingRaw.id)) {
+      delete workingRaw.id;
+    }
+  }
 
   // 1. Check if any property value in the row is a full JSON object string (e.g., rawJson under any header name)
-  for (const val of Object.values(raw)) {
+  let embeddedJson: Record<string, any> | null = null;
+  for (const val of Object.values(workingRaw)) {
     if (typeof val === 'string') {
       const trimmed = val.trim();
       if (trimmed.length > 10 && trimmed.startsWith('{') && trimmed.endsWith('}')) {
         try {
           const parsed = JSON.parse(trimmed);
           if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-            merged = { ...merged, ...parsed };
+            embeddedJson = { ...(embeddedJson || {}), ...parsed };
           }
         } catch {
           // ignore non-json
@@ -157,10 +201,85 @@ export function normalizeSingleRecord(raw: any, index: number, prefix = 'REC'): 
     }
   }
 
-  // 2. Build case-insensitive & punctuation-stripped key lookup
+  let merged: Record<string, any>;
+  if (embeddedJson) {
+    // Use embeddedJson as the authoritative record so misaligned Indonesian headers do not corrupt fields
+    merged = { ...embeddedJson };
+    const col1Id =
+      workingRaw.id ||
+      workingRaw['ID Unit'] ||
+      workingRaw['ID Pajak'] ||
+      workingRaw['ID Log'] ||
+      workingRaw['ID Transaksi'] ||
+      workingRaw['ID Timesheet'] ||
+      workingRaw['ID Servis'] ||
+      workingRaw['ID Supir'] ||
+      workingRaw['ID Akun'];
+    if (!merged.id && col1Id) merged.id = col1Id;
+    if ((!merged.nopol || merged.nopol === '-') && workingRaw['No. Polisi'] && workingRaw['No. Polisi'] !== 'expense' && workingRaw['No. Polisi'] !== 'income') {
+      merged.nopol = workingRaw['No. Polisi'];
+    }
+  } else {
+    merged = { ...workingRaw };
+
+    // Handle 3 misaligned legacy sheets where rawJson in col 10/11 was truncated by old 8/9-col Row 1 headers
+    if (
+      typeof workingRaw['Nama Lengkap'] === 'string' &&
+      workingRaw['Nama Lengkap'].startsWith('DRV-') &&
+      workingRaw['NIK KTP']
+    ) {
+      merged = {
+        id: workingRaw['ID Supir'] || workingRaw.id,
+        nip: workingRaw['Nama Lengkap'],
+        name: workingRaw['NIK KTP'],
+        phone: workingRaw['No. WhatsApp / HP'] || '-',
+        simType: workingRaw['Golongan SIM'] || 'B2 Umum',
+        simExpiryDate: workingRaw['No. SIM'] || '',
+        assignedVehicle: workingRaw['Masa Berlaku SIM'] || '-',
+        companyName: workingRaw['Status Tugas'] || 'PT Transindo Logistik',
+        status: workingRaw['Tanggal Bergabung'] || 'active'
+      };
+    } else if (
+      typeof workingRaw['Saldo Awal (Rp)'] === 'string' &&
+      typeof workingRaw['Catatan'] === 'number' &&
+      workingRaw['ID Akun']
+    ) {
+      merged = {
+        id: workingRaw['ID Akun'],
+        accountName: workingRaw['Nama Akun / Rekening'] || '-',
+        accountNumber: workingRaw['Nomor Rekening'] || '-',
+        bankName: workingRaw['Bank / Penyedia'] || '-',
+        accountType: workingRaw['Tipe Akun'] || 'bank',
+        companyName: workingRaw['Saldo Awal (Rp)'] || 'PT Transindo Logistik',
+        initialBalance: Number(workingRaw['Saldo Terkini (Rp)']) || 0,
+        currentBalance: Number(workingRaw['Catatan']) || 0,
+        isActive: true
+      };
+    } else if (
+      typeof workingRaw.status === 'number' &&
+      typeof workingRaw.depositedAmount === 'string' &&
+      workingRaw.companyName
+    ) {
+      merged = {
+        id: workingRaw.id,
+        companyName: workingRaw.companyName,
+        companyCode: workingRaw.contactPerson || '',
+        picName: workingRaw.phone || '-',
+        picPhone: workingRaw.depositedAmount || '-',
+        totalTopUpAmount: Number(workingRaw.usedPocketMoney) || 0,
+        totalUsedAmount: Number(workingRaw.usedFuelCost) || 0,
+        initialDepositBalance: Number(workingRaw.remainingBalance) || 0,
+        currentBalance: Number(workingRaw.status) || 0,
+        status: 'active'
+      };
+    }
+  }
+
+  // 2. Build case-insensitive & punctuation-stripped key lookup (excluding raw JSON blobs)
   const normalizedLookup: Record<string, any> = {};
   for (const [k, v] of Object.entries(merged)) {
-    if (v !== undefined && v !== null && v !== '') {
+    if (v !== undefined && v !== null && v !== '' && v !== '-') {
+      if (typeof v === 'string' && v.trim().startsWith('{') && v.trim().endsWith('}')) continue;
       const cleanKey = k.toLowerCase().replace(/[^a-z0-9]/g, '');
       if (normalizedLookup[cleanKey] === undefined) {
         normalizedLookup[cleanKey] = v;
@@ -168,12 +287,12 @@ export function normalizeSingleRecord(raw: any, index: number, prefix = 'REC'): 
     }
   }
 
-  // 3. Apply canonical field aliases if canonical field is missing or empty
+  // 3. Apply canonical field aliases if canonical field is missing, empty, or '-'
   for (const [canonicalField, aliases] of Object.entries(FIELD_ALIAS_MAP)) {
     const currentVal = merged[canonicalField];
-    if (currentVal === undefined || currentVal === null || currentVal === '') {
+    if (currentVal === undefined || currentVal === null || currentVal === '' || currentVal === '-') {
       for (const alias of aliases) {
-        if (normalizedLookup[alias] !== undefined && normalizedLookup[alias] !== '') {
+        if (normalizedLookup[alias] !== undefined && normalizedLookup[alias] !== '' && normalizedLookup[alias] !== '-') {
           merged[canonicalField] = normalizedLookup[alias];
           break;
         }
@@ -181,7 +300,31 @@ export function normalizeSingleRecord(raw: any, index: number, prefix = 'REC'): 
     }
   }
 
-  // 4. Guarantee a non-empty ID
+  // 4. Parse allowedModulesJson if present on user records
+  if (!Array.isArray(merged.allowedTabs) && typeof merged.allowedModulesJson === 'string') {
+    try {
+      const parsedTabs = JSON.parse(merged.allowedModulesJson);
+      if (Array.isArray(parsedTabs)) {
+        merged.allowedTabs = parsedTabs;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // 5. Normalize date fields to YYYY-MM-DD for HTML date inputs and badge calculations
+  for (const df of DATE_FIELDS) {
+    if (typeof merged[df] === 'string') {
+      const trimmedDate = merged[df].trim();
+      if (trimmedDate === '-') {
+        merged[df] = '';
+      } else if (/^\d{4}-\d{2}-\d{2}T/.test(trimmedDate)) {
+        merged[df] = trimmedDate.slice(0, 10);
+      }
+    }
+  }
+
+  // 6. Guarantee a non-empty ID
   const rawId = String(merged.id ?? '').trim();
   if (!rawId || rawId === 'undefined' || rawId === 'null') {
     merged.id = `${prefix}-ROW-${index + 1}`;
@@ -201,10 +344,22 @@ export function stripDummyRecords<T>(items: T[], prefix = 'REC'): T[] {
   if (!Array.isArray(items)) return [];
   const seenIds = new Set<string>();
   const result: T[] = [];
+  const isVehiclePrefix = prefix === 'VH' || prefix === 'VEHI';
 
   items.forEach((rawItem: any, idx: number) => {
     const norm = normalizeSingleRecord(rawItem, idx, prefix);
     if (!norm) return;
+
+    // Eliminate corrupted ghost vehicle rows that have neither plate number nor brand
+    if (isVehiclePrefix) {
+      const nopolVal = String(norm.nopol ?? '').trim();
+      const brandVal = String(norm.brand ?? '').trim();
+      const hasNopol = nopolVal.length > 0 && nopolVal !== '-';
+      const hasBrand = brandVal.length > 0 && brandVal !== '-';
+      if (!hasNopol && !hasBrand) {
+        return;
+      }
+    }
 
     let finalId = String(norm.id).trim();
     if (!finalId || seenIds.has(finalId)) {
@@ -544,8 +699,13 @@ export const getStoredConfig = (): GoogleSheetsConfig => {
     
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed.webAppUrl && parsed.webAppUrl.trim().length > 0) {
-        return parsed;
+      if (parsed && typeof parsed.webAppUrl === 'string' && parsed.webAppUrl.trim().startsWith('http')) {
+        return {
+          ...DEFAULT_SHEETS_CONFIG,
+          ...parsed,
+          webAppUrl: parsed.webAppUrl.trim(),
+          isConnected: true
+        };
       }
     }
 
@@ -566,7 +726,7 @@ export const getStoredConfig = (): GoogleSheetsConfig => {
       };
     }
     
-    return raw ? JSON.parse(raw) : DEFAULT_SHEETS_CONFIG;
+    return DEFAULT_SHEETS_CONFIG;
   } catch {
     return DEFAULT_SHEETS_CONFIG;
   }

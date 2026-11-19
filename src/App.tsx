@@ -180,6 +180,137 @@ export function App() {
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
   const pendingMutationsRef = useRef<number>(0);
+  const mutationVersionRef = useRef<number>(0);
+
+  const applyCloudData = (d: any) => {
+    if (!d || typeof d !== 'object') return;
+    const cleanCloudArray = <T,>(arr: unknown, prefix = 'REC'): T[] => {
+      if (!Array.isArray(arr)) return [];
+      return stripDummyRecords<T>(arr as T[], prefix);
+    };
+
+    if (Array.isArray(d.vehicles)) {
+      const cleanVehicles = cleanCloudArray<Vehicle>(d.vehicles, 'VH').map((v: any, idx: number) => ({
+        ...v,
+        id: String(v.id || `VH-ROW-${idx + 1}`).trim(),
+        nopol: v.nopol || v.plateNumber || '-',
+        brand: v.brand || '-',
+        model: v.model || '',
+        type: v.type || v.model || 'Dump Truck',
+        year: Number(v.year) || new Date().getFullYear(),
+        fuelType: v.fuelType || 'Bio Solar',
+        ownerCompany: v.ownerCompany || v.companyName || 'PT Transindo Logistik',
+        currentOdometer: Number(v.currentOdometer ?? v.odometer ?? v.lastOdometer ?? 0),
+        assignedDriver: v.assignedDriver || v.driverName || '-',
+        status: v.status || 'active',
+        stnk1YearDate: v.stnk1YearDate || '',
+        stnk5YearDate: v.stnk5YearDate || '',
+        kirDate: v.kirDate || '',
+        targetKmPerLiter: Number(v.targetKmPerLiter) || 5.0,
+        capacityTon: Number(v.capacityTon) || 10
+      }));
+      setVehicles(cleanVehicles);
+      saveStoredData({ vehicles: cleanVehicles });
+    }
+    if (Array.isArray(d.taxes)) {
+      const cleanTaxes = cleanCloudArray<TaxRecord>(d.taxes, 'TAX').map((t: any, idx: number) => ({
+        ...t,
+        id: String(t.id || `TAX-ROW-${idx + 1}`).trim(),
+        nopol: t.nopol || '-',
+        documentType: t.documentType || t.taxType || 'Pajak Tahunan STNK',
+        dueDate: t.dueDate || '',
+        amount: Number(t.amount ?? t.estimatedCost ?? 0),
+        status: t.status || 'due_soon'
+      }));
+      setTaxes(cleanTaxes);
+      saveStoredData({ taxes: cleanTaxes });
+    }
+    if (Array.isArray(d.fuelLogs)) {
+      const cleanFuel = cleanCloudArray<FuelLog>(d.fuelLogs, 'BBM').map((f: any, idx: number) => ({
+        ...f,
+        id: String(f.id || `BBM-ROW-${idx + 1}`).trim(),
+        nopol: f.nopol || '-',
+        driverName: f.driverName || '-',
+        volumeLiters: Number(f.volumeLiters ?? f.liters ?? 0),
+        pricePerLiter: Number(f.pricePerLiter ?? 0),
+        totalCost: Number(f.totalCost ?? 0),
+        odometer: Number(f.odometer ?? 0),
+        fuelStation: f.fuelStation || f.stationName || 'SPBU'
+      }));
+      setFuelLogs(cleanFuel);
+      saveStoredData({ fuelLogs: cleanFuel });
+    }
+    if (Array.isArray(d.finances)) {
+      const cleanFinances = cleanCloudArray<OperationalFinance>(d.finances, 'FIN');
+      setFinances(cleanFinances);
+      saveStoredData({ finances: cleanFinances });
+    }
+    if (Array.isArray(d.accounts)) {
+      const cleanAccounts = cleanCloudArray<FinancialAccount>(d.accounts, 'ACC');
+      setAccounts(cleanAccounts);
+      saveStoredData({ accounts: cleanAccounts });
+    }
+    if (Array.isArray((d as any).companyDeposits)) {
+      const cleanDeposits = cleanCloudArray<CompanyDeposit>((d as any).companyDeposits, 'DEP');
+      setCompanyDeposits(cleanDeposits);
+      saveStoredData({ companyDeposits: cleanDeposits });
+    }
+    if (Array.isArray(d.timesheets)) {
+      const cleanTimesheets = cleanCloudArray<DriverTimesheet>(d.timesheets, 'TS');
+      setTimesheets(cleanTimesheets);
+      saveStoredData({ timesheets: cleanTimesheets });
+    }
+    if (Array.isArray(d.maintenance)) {
+      const cleanMaintenance = cleanCloudArray<MaintenanceRecord>(d.maintenance, 'MNT');
+      setMaintenance(cleanMaintenance);
+      saveStoredData({ maintenance: cleanMaintenance });
+    }
+    if (Array.isArray(d.drivers)) {
+      const cleanDrivers = cleanCloudArray<Driver>(d.drivers, 'DRV').map((dr: any, idx: number) => ({
+        ...dr,
+        id: String(dr.id || `DRV-ROW-${idx + 1}`).trim(),
+        name: dr.name || dr.fullName || '-',
+        phone: dr.phone || '-',
+        simType: dr.simType || dr.simClass || dr.licenseType || 'B1 Umum',
+        simExpiryDate: dr.simExpiryDate || dr.simExpiry || dr.licenseExpiry || '-',
+        assignedVehicle: dr.assignedVehicle || dr.assignedPlateNumber || '-',
+        status: dr.status || 'active'
+      }));
+      setDrivers(cleanDrivers);
+      saveStoredData({ drivers: cleanDrivers });
+    }
+    if (Array.isArray((d as any).pocketFlows)) {
+      const cleanPocket = cleanCloudArray<DriverPocketCashFlow>((d as any).pocketFlows, 'PKT');
+      setPocketFlows(cleanPocket);
+      saveStoredData({ pocketFlows: cleanPocket });
+    }
+    const eqList = (d as any).equipmentFlows || (d as any).equipmentList;
+    if (Array.isArray(eqList)) {
+      const cleanEq = cleanCloudArray<EquipmentCashFlow>(eqList, 'EQP');
+      setEquipmentList(cleanEq);
+      saveStoredData({ equipment: cleanEq });
+    }
+    if (Array.isArray((d as any).tripSheets)) {
+      const cleanTrips = cleanCloudArray<TripSheet>((d as any).tripSheets, 'TRP');
+      setTripSheets(cleanTrips);
+      saveStoredData({ tripSheets: cleanTrips });
+    }
+    if (Array.isArray((d as any).sparepartInventory)) {
+      const cleanParts = cleanCloudArray<SparepartInventoryItem>((d as any).sparepartInventory, 'PRT');
+      setSparepartInventory(cleanParts);
+      saveStoredData({ sparepartInventory: cleanParts });
+    }
+    if (Array.isArray((d as any).sparepartMovements)) {
+      const cleanMovs = cleanCloudArray<SparepartStockMovement>((d as any).sparepartMovements, 'MOV');
+      setSparepartMovements(cleanMovs);
+      saveStoredData({ sparepartMovements: cleanMovs });
+    }
+    if (Array.isArray((d as any).users) && (d as any).users.length > 0) {
+      const cleanUsers = cleanCloudArray<UserAccount>((d as any).users, 'USR');
+      setUsers(cleanUsers);
+      saveStoredData({ users: cleanUsers });
+    }
+  };
 
   // Real-time synchronization worker (Google Spreadsheet as Primary Clean Database)
   const pullFromGas = async (silent = true) => {
@@ -190,139 +321,15 @@ export function App() {
     const canSync = isRunningInGAS() || (cfg.webAppUrl && cfg.webAppUrl.startsWith('http'));
     if (!canSync) return;
     if (!silent) setIsSyncing(true);
+    const pullStartVersion = mutationVersionRef.current;
     try {
       const res = await fetchAppDataFromGAS(cfg.webAppUrl);
-      if (silent && pendingMutationsRef.current > 0) return;
+      if (silent && (pendingMutationsRef.current > 0 || mutationVersionRef.current !== pullStartVersion)) {
+        return;
+      }
 
       if (res.success && res.data) {
-        const d = res.data;
-        const cleanCloudArray = <T,>(arr: unknown, prefix = 'REC'): T[] => {
-          if (!Array.isArray(arr)) return [];
-          return stripDummyRecords<T>(arr as T[], prefix);
-        };
-
-        if (Array.isArray(d.vehicles)) {
-          const cleanVehicles = cleanCloudArray<Vehicle>(d.vehicles, 'VH').map((v: any, idx: number) => ({
-            ...v,
-            id: String(v.id || `VH-ROW-${idx + 1}`).trim(),
-            nopol: v.nopol || v.plateNumber || '-',
-            brand: v.brand || '-',
-            model: v.model || '',
-            type: v.type || v.model || 'Dump Truck',
-            year: Number(v.year) || new Date().getFullYear(),
-            fuelType: v.fuelType || 'Bio Solar',
-            ownerCompany: v.ownerCompany || v.companyName || 'PT Transindo Logistik',
-            currentOdometer: Number(v.currentOdometer ?? v.odometer ?? v.lastOdometer ?? 0),
-            assignedDriver: v.assignedDriver || v.driverName || '-',
-            status: v.status || 'active',
-            stnk1YearDate: v.stnk1YearDate || '',
-            stnk5YearDate: v.stnk5YearDate || '',
-            kirDate: v.kirDate || '',
-            targetKmPerLiter: Number(v.targetKmPerLiter) || 5.0,
-            capacityTon: Number(v.capacityTon) || 10
-          }));
-          setVehicles(cleanVehicles);
-          saveStoredData({ vehicles: cleanVehicles });
-        }
-        if (Array.isArray(d.taxes)) {
-          const cleanTaxes = cleanCloudArray<TaxRecord>(d.taxes, 'TAX').map((t: any, idx: number) => ({
-            ...t,
-            id: String(t.id || `TAX-ROW-${idx + 1}`).trim(),
-            nopol: t.nopol || '-',
-            documentType: t.documentType || t.taxType || 'Pajak Tahunan STNK',
-            dueDate: t.dueDate || '',
-            amount: Number(t.amount ?? t.estimatedCost ?? 0),
-            status: t.status || 'due_soon'
-          }));
-          setTaxes(cleanTaxes);
-          saveStoredData({ taxes: cleanTaxes });
-        }
-        if (Array.isArray(d.fuelLogs)) {
-          const cleanFuel = cleanCloudArray<FuelLog>(d.fuelLogs, 'BBM').map((f: any, idx: number) => ({
-            ...f,
-            id: String(f.id || `BBM-ROW-${idx + 1}`).trim(),
-            nopol: f.nopol || '-',
-            driverName: f.driverName || '-',
-            volumeLiters: Number(f.volumeLiters ?? f.liters ?? 0),
-            pricePerLiter: Number(f.pricePerLiter ?? 0),
-            totalCost: Number(f.totalCost ?? 0),
-            odometer: Number(f.odometer ?? 0),
-            fuelStation: f.fuelStation || f.stationName || 'SPBU'
-          }));
-          setFuelLogs(cleanFuel);
-          saveStoredData({ fuelLogs: cleanFuel });
-        }
-        if (Array.isArray(d.finances)) {
-          const cleanFinances = cleanCloudArray<OperationalFinance>(d.finances, 'FIN');
-          setFinances(cleanFinances);
-          saveStoredData({ finances: cleanFinances });
-        }
-        if (Array.isArray(d.accounts)) {
-          const cleanAccounts = cleanCloudArray<FinancialAccount>(d.accounts, 'ACC');
-          setAccounts(cleanAccounts);
-          saveStoredData({ accounts: cleanAccounts });
-        }
-        if (Array.isArray((d as any).companyDeposits)) {
-          const cleanDeposits = cleanCloudArray<CompanyDeposit>((d as any).companyDeposits, 'DEP');
-          setCompanyDeposits(cleanDeposits);
-          saveStoredData({ companyDeposits: cleanDeposits });
-        }
-        if (Array.isArray(d.timesheets)) {
-          const cleanTimesheets = cleanCloudArray<DriverTimesheet>(d.timesheets, 'TS');
-          setTimesheets(cleanTimesheets);
-          saveStoredData({ timesheets: cleanTimesheets });
-        }
-        if (Array.isArray(d.maintenance)) {
-          const cleanMaintenance = cleanCloudArray<MaintenanceRecord>(d.maintenance, 'MNT');
-          setMaintenance(cleanMaintenance);
-          saveStoredData({ maintenance: cleanMaintenance });
-        }
-        if (Array.isArray(d.drivers)) {
-          const cleanDrivers = cleanCloudArray<Driver>(d.drivers, 'DRV').map((dr: any, idx: number) => ({
-            ...dr,
-            id: String(dr.id || `DRV-ROW-${idx + 1}`).trim(),
-            name: dr.name || dr.fullName || '-',
-            phone: dr.phone || '-',
-            simType: dr.simType || dr.simClass || dr.licenseType || 'B1 Umum',
-            simExpiryDate: dr.simExpiryDate || dr.simExpiry || dr.licenseExpiry || '-',
-            assignedVehicle: dr.assignedVehicle || dr.assignedPlateNumber || '-',
-            status: dr.status || 'active'
-          }));
-          setDrivers(cleanDrivers);
-          saveStoredData({ drivers: cleanDrivers });
-        }
-        if (Array.isArray((d as any).pocketFlows)) {
-          const cleanPocket = cleanCloudArray<DriverPocketCashFlow>((d as any).pocketFlows, 'PKT');
-          setPocketFlows(cleanPocket);
-          saveStoredData({ pocketFlows: cleanPocket });
-        }
-        const eqList = (d as any).equipmentFlows || (d as any).equipmentList;
-        if (Array.isArray(eqList)) {
-          const cleanEq = cleanCloudArray<EquipmentCashFlow>(eqList, 'EQP');
-          setEquipmentList(cleanEq);
-          saveStoredData({ equipment: cleanEq });
-        }
-        if (Array.isArray((d as any).tripSheets)) {
-          const cleanTrips = cleanCloudArray<TripSheet>((d as any).tripSheets, 'TRP');
-          setTripSheets(cleanTrips);
-          saveStoredData({ tripSheets: cleanTrips });
-        }
-        if (Array.isArray((d as any).sparepartInventory)) {
-          const cleanParts = cleanCloudArray<SparepartInventoryItem>((d as any).sparepartInventory, 'PRT');
-          setSparepartInventory(cleanParts);
-          saveStoredData({ sparepartInventory: cleanParts });
-        }
-        if (Array.isArray((d as any).sparepartMovements)) {
-          const cleanMovs = cleanCloudArray<SparepartStockMovement>((d as any).sparepartMovements, 'MOV');
-          setSparepartMovements(cleanMovs);
-          saveStoredData({ sparepartMovements: cleanMovs });
-        }
-        if (Array.isArray((d as any).users) && (d as any).users.length > 0) {
-          const cleanUsers = cleanCloudArray<UserAccount>((d as any).users, 'USR');
-          setUsers(cleanUsers);
-          saveStoredData({ users: cleanUsers });
-        }
-
+        applyCloudData(res.data);
         if (!silent) showToast('Data disinkronkan real-time dari database utama Google Sheets!');
       }
     } catch {
@@ -682,6 +689,7 @@ export function App() {
 
   // Push to Google Sheets if configured or running inside GAS
   const pushToGas = async (action: string, data: unknown) => {
+    mutationVersionRef.current += 1;
     const cfg = loadGoogleSheetsConfig();
     const targetUrl = (gasConfig.webAppUrl || cfg.webAppUrl || '').trim();
     if (!isRunningInGAS() && (!targetUrl || !targetUrl.startsWith('http'))) return;
@@ -693,7 +701,7 @@ export function App() {
     } finally {
       setTimeout(() => {
         pendingMutationsRef.current = Math.max(0, pendingMutationsRef.current - 1);
-      }, 1500);
+      }, 2000);
     }
   };
 
@@ -705,6 +713,7 @@ export function App() {
 
   // --- Handlers: Vehicles ---
   const handleAddVehicle = (v: Vehicle) => {
+    mutationVersionRef.current += 1;
     const updated = [v, ...vehicles];
     setVehicles(updated);
     createActivityLog(
@@ -723,9 +732,35 @@ export function App() {
   };
 
   const handleUpdateVehicle = (v: Vehicle) => {
-    if (!v?.id) return;
-    const targetId = String(v.id).trim();
-    const updated = vehicles.map(item => (String(item.id).trim() === targetId ? v : item));
+    if (!v) return;
+    mutationVersionRef.current += 1;
+    const targetId = String(v.id || '').trim();
+    const targetRowIdx = typeof (v as any)._sheetRowIndex === 'number' ? (v as any)._sheetRowIndex : -1;
+
+    let matched = false;
+    let updated = vehicles.map((item, idx) => {
+      if (!matched && targetId && String(item.id || '').trim() === targetId) {
+        matched = true;
+        return v;
+      }
+      return item;
+    });
+
+    if (!matched && targetRowIdx >= 0 && targetRowIdx < vehicles.length) {
+      updated = vehicles.map((item, idx) => {
+        if (
+          !matched &&
+          (typeof (item as any)._sheetRowIndex === 'number'
+            ? (item as any)._sheetRowIndex === targetRowIdx
+            : idx === targetRowIdx)
+        ) {
+          matched = true;
+          return { ...v, id: item.id || v.id || `VH-ROW-${idx + 1}` };
+        }
+        return item;
+      });
+    }
+
     setVehicles(updated);
     createActivityLog(
       'vehicle',
@@ -743,28 +778,45 @@ export function App() {
   };
 
   const handleDeleteVehicle = (id: string) => {
+    mutationVersionRef.current += 1;
     const targetId = String(id || '').trim();
     if (!targetId) return;
-    const targetIndex = vehicles.findIndex(v => String(v.id).trim() === targetId);
+
+    let targetIndex = vehicles.findIndex(v => String(v.id || '').trim() === targetId);
+    if (targetIndex < 0) {
+      const rowMatch = targetId.match(/ROW-(\d+)/i);
+      if (rowMatch) {
+        const idxCandidate = parseInt(rowMatch[1], 10) - 1;
+        if (idxCandidate >= 0 && idxCandidate < vehicles.length) {
+          targetIndex = idxCandidate;
+        }
+      }
+    }
+
     const target = targetIndex >= 0 ? vehicles[targetIndex] : undefined;
-    const updated = vehicles.filter(v => String(v.id).trim() !== targetId);
+    const effectiveSheetId = String(target?.id || targetId).trim();
+    const updated =
+      targetIndex >= 0
+        ? vehicles.filter((_, idx) => idx !== targetIndex)
+        : vehicles.filter(v => String(v.id || '').trim() !== targetId);
+
     setVehicles(updated);
     createActivityLog(
       'vehicle',
       'delete',
       'Hapus Unit Armada',
-      `Penghapusan unit armada ${target?.nopol || targetId} dari sistem operasional.`,
-      targetId,
-      target?.nopol || targetId,
+      `Penghapusan unit armada ${target?.nopol || effectiveSheetId} dari sistem operasional.`,
+      effectiveSheetId,
+      target?.nopol || effectiveSheetId,
       undefined,
       'danger'
     );
     persistAll({ vehicles: updated });
     pushToGas('deleteVehicle', {
-      id: targetId,
+      id: effectiveSheetId,
       rowIndex: typeof (target as any)?._sheetRowIndex === 'number' ? (target as any)._sheetRowIndex : targetIndex
     });
-    showToast(`Kendaraan ${target?.nopol || targetId} berhasil dihapus`, 'info');
+    showToast(`Kendaraan ${target?.nopol || effectiveSheetId} berhasil dihapus`, 'info');
   };
 
   // --- Handlers: Taxes ---
@@ -3351,6 +3403,8 @@ export function App() {
                     onUpdateVehicle={handleUpdateVehicle}
                     onDeleteVehicle={handleDeleteVehicle}
                     onSelectVehicleForDetail={setSelectedVehicleForDetail}
+                    onSyncSpreadsheet={() => pullFromGas(false)}
+                    isSyncing={isSyncing}
                   />
                 )}
 
@@ -3781,7 +3835,14 @@ export function App() {
           onSaveConfig={(cfg) => {
             setGasConfig(cfg);
             saveGoogleSheetsConfig(cfg);
+            if (cfg.webAppUrl && cfg.webAppUrl.startsWith('http')) {
+              pullFromGas(false);
+            }
             showToast('Konfigurasi Google Apps Script tersimpan!');
+          }}
+          onRestoreFromCloud={(cloudData) => {
+            applyCloudData(cloudData);
+            showToast('Data berhasil disinkronkan dari Google Spreadsheet!');
           }}
           allAppData={{
             vehicles,

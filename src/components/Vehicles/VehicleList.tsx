@@ -14,7 +14,8 @@ import {
   Table,
   Calendar,
   Fuel,
-  Building2
+  Building2,
+  RefreshCw
 } from 'lucide-react';
 import { Vehicle, VehicleType, FuelType, VehicleStatus, UserRole } from '../../types';
 import {
@@ -39,6 +40,8 @@ interface VehicleListProps {
   onUpdateVehicle: (v: Vehicle) => void;
   onDeleteVehicle: (id: string) => void;
   onSelectVehicleForDetail: (v: Vehicle) => void;
+  onSyncSpreadsheet?: () => void;
+  isSyncing?: boolean;
 }
 
 export const VehicleList: React.FC<VehicleListProps> = ({
@@ -48,7 +51,9 @@ export const VehicleList: React.FC<VehicleListProps> = ({
   onAddVehicle,
   onUpdateVehicle,
   onDeleteVehicle,
-  onSelectVehicleForDetail
+  onSelectVehicleForDetail,
+  onSyncSpreadsheet,
+  isSyncing = false
 }) => {
   const safeVehicles = Array.isArray(vehicles) ? vehicles : [];
   const perms = getRolePermissions(userRole);
@@ -167,14 +172,30 @@ export const VehicleList: React.FC<VehicleListProps> = ({
     setIsModalOpen(true);
   };
 
-  const handleOpenEdit = (vehicle: Vehicle) => {
-    setEditingVehicle(vehicle);
+  const cleanDateInput = (val?: string) => {
+    if (!val || val === '-') return '';
+    const trimmed = String(val).trim();
+    return /^\d{4}-\d{2}-\d{2}/.test(trimmed) ? trimmed.slice(0, 10) : '';
+  };
+
+  const handleOpenEdit = (vehicle: Vehicle, fallbackRowNumber?: number) => {
+    const effectiveId = String(vehicle.id || `VH-ROW-${fallbackRowNumber || 1}`).trim();
+    const targetWithId: Vehicle = { ...vehicle, id: effectiveId };
+    setEditingVehicle(targetWithId);
     setFormData({
-      ...vehicle,
+      ...targetWithId,
       nopol: vehicle.nopol === '-' ? '' : (vehicle.nopol || ''),
       brand: vehicle.brand === '-' ? '' : (vehicle.brand || ''),
+      model: vehicle.model === '-' ? '' : (vehicle.model || ''),
+      type: (vehicle.type && (vehicle.type as string) !== 'Truck' ? vehicle.type : 'Dump Truck') as VehicleType,
+      fuelType: (vehicle.fuelType || 'Bio Solar') as FuelType,
       assignedDriver: vehicle.assignedDriver === '-' ? '' : (vehicle.assignedDriver || ''),
-      ownerCompany: vehicle.ownerCompany || 'PT Transindo Logistik'
+      driverPhone: vehicle.driverPhone === '-' ? '' : (vehicle.driverPhone || ''),
+      ownerCompany: vehicle.ownerCompany || 'PT Transindo Logistik',
+      stnk1YearDate: cleanDateInput(vehicle.stnk1YearDate),
+      stnk5YearDate: cleanDateInput(vehicle.stnk5YearDate),
+      kirDate: cleanDateInput(vehicle.kirDate),
+      insuranceDate: cleanDateInput(vehicle.insuranceDate)
     });
     setIsModalOpen(true);
   };
@@ -189,7 +210,7 @@ export const VehicleList: React.FC<VehicleListProps> = ({
       onUpdateVehicle({
         ...editingVehicle,
         ...formData,
-        id: editingVehicle.id || ('VH-' + Date.now().toString().slice(-4)),
+        id: String(editingVehicle.id || ('VH-' + Date.now().toString().slice(-4))).trim(),
         nopol: cleanNopol,
         brand: cleanBrand,
         ownerCompany: formData.ownerCompany || 'PT Transindo Logistik'
@@ -223,10 +244,11 @@ export const VehicleList: React.FC<VehicleListProps> = ({
     setIsModalOpen(false);
   };
 
-  const handleDelete = (id: string, nopol: string) => {
-    const label = nopol && nopol !== '-' ? nopol : `ID: ${id}`;
+  const handleDelete = (id: string, nopol: string, fallbackRowNumber?: number) => {
+    const effectiveId = String(id || `VH-ROW-${fallbackRowNumber || 1}`).trim();
+    const label = nopol && nopol !== '-' ? nopol : `ID: ${effectiveId}`;
     confirmDelete(`Yakin ingin menghapus unit kendaraan ${label}?`).then((ok) => {
-      if (ok) onDeleteVehicle(id);
+      if (ok) onDeleteVehicle(effectiveId);
     });
   };
 
@@ -299,16 +321,31 @@ export const VehicleList: React.FC<VehicleListProps> = ({
             </button>
           </div>
 
+          {onSyncSpreadsheet && (
+            <button
+              type="button"
+              onClick={onSyncSpreadsheet}
+              disabled={isSyncing}
+              className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-semibold text-xs rounded-lg shadow-2xs active:scale-95 transition cursor-pointer disabled:opacity-60"
+              title="Sinkronkan Data Kendaraan dari Google Spreadsheet"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>{isSyncing ? 'Sinkronisasi...' : 'Sinkron Spreadsheet'}</span>
+            </button>
+          )}
+
           {perms.canAddVehicle ? (
             <button
+              type="button"
               onClick={handleOpenAdd}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-lg shadow-xs active:scale-95 transition"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-lg shadow-xs active:scale-95 transition cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Tambah Kendaraan</span>
             </button>
           ) : (
             <button
+              type="button"
               disabled
               className="flex items-center gap-2 px-3.5 py-2 bg-slate-100 text-slate-400 font-medium text-xs rounded-lg cursor-not-allowed border border-slate-200"
               title="Hanya Admin dan Owner yang dapat menambah unit baru"
@@ -573,8 +610,9 @@ export const VehicleList: React.FC<VehicleListProps> = ({
                         <td className="py-3.5 px-4">
                           <div className="flex items-center justify-center gap-1.5">
                             <button
+                              type="button"
                               onClick={() => onSelectVehicleForDetail(vehicle)}
-                              className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold border border-blue-200/70 transition"
+                              className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold border border-blue-200/70 transition cursor-pointer"
                               title="Detail & Histori Lengkap"
                             >
                               <Eye className="w-3.5 h-3.5" />
@@ -582,8 +620,9 @@ export const VehicleList: React.FC<VehicleListProps> = ({
                             </button>
                             {perms.canEditVehicle && (
                               <button
-                                onClick={() => handleOpenEdit(vehicle)}
-                                className="p-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-lg transition"
+                                type="button"
+                                onClick={() => handleOpenEdit(vehicle, rowNumber)}
+                                className="p-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-lg transition cursor-pointer"
                                 title="Edit Kendaraan"
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
@@ -591,8 +630,9 @@ export const VehicleList: React.FC<VehicleListProps> = ({
                             )}
                             {perms.canDeleteVehicle && (
                               <button
-                                onClick={() => handleDelete(vehicle.id, vehicle.nopol)}
-                                className="p-1.5 bg-white border border-slate-200 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition"
+                                type="button"
+                                onClick={() => handleDelete(vehicle.id, vehicle.nopol, rowNumber)}
+                                className="p-1.5 bg-white border border-slate-200 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition cursor-pointer"
                                 title="Hapus Kendaraan"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -725,8 +765,9 @@ export const VehicleList: React.FC<VehicleListProps> = ({
                   {/* Action Buttons */}
                   <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
                     <button
+                      type="button"
                       onClick={() => onSelectVehicleForDetail(vehicle)}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-medium border border-slate-200 transition"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-medium border border-slate-200 transition cursor-pointer"
                     >
                       <Eye className="w-3.5 h-3.5 text-blue-600" />
                       <span>Detail &amp; Histori</span>
@@ -734,8 +775,9 @@ export const VehicleList: React.FC<VehicleListProps> = ({
 
                     {perms.canEditVehicle && (
                       <button
+                        type="button"
                         onClick={() => handleOpenEdit(vehicle)}
-                        className="p-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg transition"
+                        className="p-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg transition cursor-pointer"
                         title="Edit Kendaraan"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
@@ -744,8 +786,9 @@ export const VehicleList: React.FC<VehicleListProps> = ({
 
                     {perms.canDeleteVehicle && (
                       <button
+                        type="button"
                         onClick={() => handleDelete(vehicle.id, vehicle.nopol)}
-                        className="p-2 bg-white border border-slate-200 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition"
+                        className="p-2 bg-white border border-slate-200 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition cursor-pointer"
                         title="Hapus Kendaraan"
                       >
                         <Trash2 className="w-3.5 h-3.5" />

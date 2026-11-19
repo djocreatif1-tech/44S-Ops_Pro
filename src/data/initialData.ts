@@ -253,9 +253,11 @@ export const INITIAL_USER_ACCOUNTS: UserAccount[] = [
 ];
 
 export const DEFAULT_SHEETS_CONFIG: GoogleSheetsConfig = {
-  webAppUrl: '',
+  webAppUrl: 'https://script.google.com/macros/s/AKfycbyi_YS56LQrDmnNZhLtrO9WhqmcVsbsBGsX7RdxJzRRvRxhSt-BMFjjH-DTkaP-O16E/exec',
   spreadsheetId: '',
   sheetNamePrefix: '44S_Ops_',
   autoSync: true,
+  isConnected: true,
   lastSyncTime: ''
 };
+
