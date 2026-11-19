@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   Truck,
-  FileWarning,
   Fuel,
   Wallet,
   Clock,
@@ -9,16 +8,12 @@ import {
   AlertTriangle,
   ChevronRight,
   ArrowUpRight,
-  Sliders,
-  Bell,
   Building2,
   Banknote,
   CreditCard,
-  CheckCircle2,
-  Info,
-  Calendar,
-  AlertCircle,
-  History
+  History,
+  FileText,
+  Coins
 } from 'lucide-react';
 import {
   Vehicle,
@@ -29,7 +24,10 @@ import {
   MaintenanceRecord,
   FinancialAccount,
   NotificationConfig,
-  ActivityLog
+  ActivityLog,
+  TripSheet,
+  EquipmentCashFlow,
+  DriverPocketCashFlow
 } from '../../types';
 import {
   formatRupiah,
@@ -37,7 +35,6 @@ import {
   formatDateIndo,
   getTaxDueBadgeInfo
 } from '../../utils/formatters';
-import { generateAppNotifications } from '../../utils/notificationEngine';
 
 interface DashboardOverviewProps {
   vehicles: Vehicle[];
@@ -49,6 +46,9 @@ interface DashboardOverviewProps {
   accounts: FinancialAccount[];
   notifConfig: NotificationConfig;
   activityLogs?: ActivityLog[];
+  tripSheets?: TripSheet[];
+  equipmentList?: EquipmentCashFlow[];
+  pocketFlows?: DriverPocketCashFlow[];
   onNavigateTab: (tab: string) => void;
   onSelectVehicleForDetail: (vehicle: Vehicle) => void;
   onOpenNotifConfig: () => void;
@@ -62,11 +62,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   timesheets = [],
   maintenance = [],
   accounts = [],
-  notifConfig,
   activityLogs = [],
+  tripSheets = [],
+  equipmentList = [],
+  pocketFlows = [],
   onNavigateTab,
-  onSelectVehicleForDetail,
-  onOpenNotifConfig
+  onSelectVehicleForDetail
 }) => {
   const safeVehicles = Array.isArray(vehicles) ? vehicles : [];
   const safeTaxes = Array.isArray(taxes) ? taxes : [];
@@ -75,19 +76,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const safeTimesheets = Array.isArray(timesheets) ? timesheets : [];
   const safeMaintenance = Array.isArray(maintenance) ? maintenance : [];
   const safeAccounts = Array.isArray(accounts) ? accounts : [];
-
-  const [selectedNotifFilter, setSelectedNotifFilter] = useState<'all' | 'tax' | 'service' | 'fuel'>('all');
-
-  // Dynamic Notification Generation based on user configuration
-  const notifications = generateAppNotifications(safeVehicles, safeTaxes, safeMaintenance, safeFuelLogs, notifConfig);
-  const filteredNotifications = (notifications || []).filter(n => {
-    if (selectedNotifFilter === 'all') return true;
-    return n.category === selectedNotifFilter;
-  });
-
-  const taxNotifCount = (notifications || []).filter(n => n.category === 'tax').length;
-  const serviceNotifCount = (notifications || []).filter(n => n.category === 'service').length;
-  const fuelNotifCount = (notifications || []).filter(n => n.category === 'fuel').length;
+  const safeTripSheets = Array.isArray(tripSheets) ? tripSheets : [];
+  const safeEquipmentList = Array.isArray(equipmentList) ? equipmentList : [];
+  const safePocketFlows = Array.isArray(pocketFlows) ? pocketFlows : [];
 
   // Vehicle Status Counts
   const activeVehicles = safeVehicles.filter(v => v.status === 'active').length;
@@ -116,140 +107,22 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const totalTrips = safeTimesheets.reduce((sum, t) => sum + (t.tripCount || 1), 0);
   const totalKmTravelled = safeTimesheets.reduce((sum, t) => sum + (t.totalDistanceKm || 0), 0);
 
+  // Trip Sheet & Logistics Metrics
+  const activeTripSheetsCount = safeTripSheets.filter(t => t.status === 'in_transit' || t.status === 'scheduled').length;
+  const totalCargoTonnes = safeTripSheets.reduce((sum, t) => sum + (t.cargoTonnageTon || 0), 0);
+
+  // Driver Pocket Money Metrics
+  const totalPocketDisbursed = safePocketFlows.reduce((sum, p) => sum + (p.totalGiven || 0), 0);
+  const pendingPocketSettlementCount = safePocketFlows.filter(p => p.status === 'in_trip' || p.status === 'disbursed').length;
+
+  // Equipment Cash Flow Metrics
+  const totalEquipmentCost = safeEquipmentList.filter(e => e.type === 'expense').reduce((sum, e) => sum + (e.totalAmount || 0), 0);
+  const totalEquipmentCount = safeEquipmentList.reduce((sum, e) => sum + (e.quantity || 1), 0);
+
+  const [dashboardTableTab, setDashboardTableTab] = useState<'tripsheet' | 'timesheet'>('tripsheet');
+
   return (
     <div className="space-y-6">
-      {/* 1. NOTIFICATION & ALERT CENTER (DAPAT DIKONFIGURASI OLEH PENGGUNA) */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3.5">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold relative shadow-2xs">
-              <Bell className="w-4 h-4" />
-              {notifications.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full text-[9px] flex items-center justify-center font-bold">
-                  {notifications.length}
-                </span>
-              )}
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-slate-800">Pusat Notifikasi &amp; Pengingat Operasional</h3>
-                <span className="bg-blue-50 text-blue-700 border border-blue-200/60 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                  Real-time Monitoring
-                </span>
-              </div>
-              <p className="text-xs text-slate-400">
-                Pajak STNK/KIR, batas KM servis rutin &amp; konsumsi BBM solar
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 self-start sm:self-auto">
-            <button
-              onClick={onOpenNotifConfig}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold transition"
-            >
-              <Sliders className="w-3.5 h-3.5 text-blue-600" />
-              <span>Atur Notifikasi</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Filter Tabs for Notifications */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
-          {[
-            { id: 'all', label: `Semua (${notifications.length})` },
-            { id: 'tax', label: `Pajak & KIR (${taxNotifCount})` },
-            { id: 'service', label: `Servis Rutin (${serviceNotifCount})` },
-            { id: 'fuel', label: `BBM Solar (${fuelNotifCount})` },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setSelectedNotifFilter(tab.id as typeof selectedNotifFilter)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition ${
-                selectedNotifFilter === tab.id
-                  ? 'bg-blue-600 text-white font-semibold shadow-2xs'
-                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/60'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Notification Items List */}
-        <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
-          {filteredNotifications.map((notif) => {
-            const isHigh = notif.severity === 'high';
-            const isMed = notif.severity === 'medium';
-
-            return (
-              <div
-                key={notif.id}
-                className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition ${
-                  isHigh
-                    ? 'bg-rose-50/60 border-rose-200/80 text-rose-900'
-                    : isMed
-                    ? 'bg-amber-50/60 border-amber-200/80 text-amber-900'
-                    : 'bg-blue-50/40 border-blue-200/60 text-slate-800'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <div className={`p-2 rounded-lg shrink-0 mt-0.5 ${
-                    isHigh
-                      ? 'bg-rose-100 text-rose-600'
-                      : isMed
-                      ? 'bg-amber-100 text-amber-600'
-                      : 'bg-blue-100 text-blue-600'
-                  }`}>
-                    {notif.category === 'tax' ? (
-                      <FileWarning className="w-4 h-4" />
-                    ) : notif.category === 'service' ? (
-                      <Wrench className="w-4 h-4" />
-                    ) : (
-                      <Fuel className="w-4 h-4" />
-                    )}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-xs font-bold text-slate-800">{notif.title}</h4>
-                      <span className={`text-[9px] font-bold px-2 py-0.2 rounded uppercase ${
-                        isHigh ? 'bg-rose-600 text-white' : isMed ? 'bg-amber-600 text-white' : 'bg-blue-600 text-white'
-                      }`}>
-                        {isHigh ? 'MENDESAK' : isMed ? 'PERHATIAN' : 'INFO'}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">{notif.message}</p>
-                  </div>
-                </div>
-
-                {notif.actionTab && (
-                  <button
-                    onClick={() => onNavigateTab(notif.actionTab!)}
-                    className={`self-start sm:self-center px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shadow-2xs transition flex items-center gap-1 shrink-0 ${
-                      isHigh
-                        ? 'bg-rose-600 hover:bg-rose-700 text-white'
-                        : isMed
-                        ? 'bg-amber-600 hover:bg-amber-700 text-white'
-                        : 'bg-blue-600 hover:bg-blue-700 text-white'
-                    }`}
-                  >
-                    <span>{notif.actionLabel || 'Tindak Lanjuti'}</span>
-                    <ChevronRight className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-            );
-          })}
-
-          {filteredNotifications.length === 0 && (
-            <div className="p-6 text-center text-slate-400 bg-slate-50 rounded-xl border border-slate-100 flex flex-col items-center justify-center gap-1.5">
-              <CheckCircle2 className="w-6 h-6 text-emerald-500" />
-              <p className="text-xs font-medium text-slate-700">Semua operasional dalam batas aman</p>
-              <p className="text-[11px] text-slate-400">Tidak ada pengingat mendesak untuk kategori yang dipilih saat ini.</p>
-            </div>
-          )}
-        </div>
-      </div>
 
       {/* 2. RINGKASAN AKUN SALDO REKENING & KAS (NEW REQUIREMENT) */}
       <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
@@ -393,6 +266,108 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       </div>
 
+      {/* 3B. OPERASIONAL EKSPEDISI: TRIP SHEET, SAKU DRIVER & ARUS KAS PERALATAN */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Card 1: Trip Sheet & Lembar Surat Jalan */}
+        <div
+          onClick={() => onNavigateTab('tripsheet')}
+          className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:border-blue-400 hover:shadow-xs transition cursor-pointer group"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                <FileText className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-800">Trip Sheet &amp; Surat Jalan</p>
+                <p className="text-[10px] text-slate-400">Ekspedisi &amp; Instruksi Ritase</p>
+              </div>
+            </div>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/60">
+              {activeTripSheetsCount} Aktif Jalan
+            </span>
+          </div>
+          <div className="mt-3.5 flex items-baseline justify-between">
+            <h4 className="text-xl font-bold font-mono text-slate-800">
+              {safeTripSheets.length} <span className="text-xs font-normal text-slate-400">Total DO / Trip</span>
+            </h4>
+            <span className="text-[11px] font-semibold text-slate-600">
+              Muatan: <b className="font-mono text-blue-700">{totalCargoTonnes}</b> Ton
+            </span>
+          </div>
+          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-blue-600 font-semibold group-hover:translate-x-0.5 transition-transform">
+            <span>Buka Surat Jalan &amp; Cetak</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </div>
+        </div>
+
+        {/* Card 2: Arus Kas Saku Driver Untuk Perjalanan */}
+        <div
+          onClick={() => onNavigateTab('finance_pocket')}
+          className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:border-emerald-400 hover:shadow-xs transition cursor-pointer group"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                <Coins className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-800">Arus Kas Saku Driver</p>
+                <p className="text-[10px] text-slate-400">Sangu, Kernet, Tol &amp; Kuli</p>
+              </div>
+            </div>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+              {pendingPocketSettlementCount} Jalan
+            </span>
+          </div>
+          <div className="mt-3.5 flex items-baseline justify-between">
+            <h4 className="text-xl font-bold font-mono text-emerald-700">
+              {formatRupiah(totalPocketDisbursed)}
+            </h4>
+            <span className="text-[11px] text-slate-500 font-medium">
+              {safePocketFlows.length} Kwitansi Sangu
+            </span>
+          </div>
+          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-emerald-600 font-semibold group-hover:translate-x-0.5 transition-transform">
+            <span>Rekonsiliasi &amp; Cetak Slip Sangu</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </div>
+        </div>
+
+        {/* Card 3: Arus Kas Peralatan Armada */}
+        <div
+          onClick={() => onNavigateTab('finance_equipment')}
+          className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:border-amber-400 hover:shadow-xs transition cursor-pointer group"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                <Wrench className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-800">Arus Kas Peralatan</p>
+                <p className="text-[10px] text-slate-400">Terpal, Lashing, APAR &amp; Tools</p>
+              </div>
+            </div>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200/60">
+              {safeEquipmentList.length} Item
+            </span>
+          </div>
+          <div className="mt-3.5 flex items-baseline justify-between">
+            <h4 className="text-xl font-bold font-mono text-slate-800">
+              {formatRupiah(totalEquipmentCost)}
+            </h4>
+            <span className="text-[11px] text-slate-500 font-medium">
+              {totalEquipmentCount} Total Unit/Set
+            </span>
+          </div>
+          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-amber-600 font-semibold group-hover:translate-x-0.5 transition-transform">
+            <span>Kelola Belanja &amp; Nota Alat</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </div>
+        </div>
+      </div>
+
       {/* 4. TWO COLUMNS: VEHICLE MONITORING & RECENT FEED */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left 2 Cols: Unit Armada Status & Timesheet */}
@@ -476,57 +451,169 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </div>
           </div>
 
-          {/* Timesheet Terkini */}
+          {/* Timesheet & Trip Sheet Terkini with Toggle */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-            <div className="p-5 border-b border-slate-100 flex justify-between items-center">
-              <div>
-                <h4 className="text-sm font-bold text-slate-800">Status Time Sheet &amp; Operasional</h4>
-                <p className="text-xs text-slate-400 mt-0.5">Log perjalanan dan ritase pengiriman hari ini</p>
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <div className="flex p-0.5 bg-slate-100 rounded-xl border border-slate-200/80">
+                  <button
+                    onClick={() => setDashboardTableTab('tripsheet')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                      dashboardTableTab === 'tripsheet'
+                        ? 'bg-white text-blue-600 shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-800'
+                    }`}
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>Trip Sheet &amp; Surat Jalan</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-blue-100 text-blue-800 font-mono">
+                      {safeTripSheets.length}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => setDashboardTableTab('timesheet')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                      dashboardTableTab === 'timesheet'
+                        ? 'bg-white text-blue-600 shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-800'
+                    }`}
+                  >
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>Time Sheet (Ritase)</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-800 font-mono">
+                      {safeTimesheets.length}
+                    </span>
+                  </button>
+                </div>
               </div>
+
               <button
-                onClick={() => onNavigateTab('timesheet')}
-                className="text-[11px] text-blue-600 font-bold hover:underline cursor-pointer"
+                onClick={() => onNavigateTab(dashboardTableTab === 'tripsheet' ? 'tripsheet' : 'timesheet')}
+                className="text-[11px] text-blue-600 font-bold hover:underline cursor-pointer flex items-center gap-1 self-end sm:self-auto"
               >
-                Lihat Semua
+                <span>Buka Modul Lengkap</span>
+                <ChevronRight className="w-3 h-3" />
               </button>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="bg-slate-50 text-[10px] uppercase text-slate-400 font-bold border-b border-slate-100">
-                  <tr>
-                    <th className="px-5 py-3">Pengemudi</th>
-                    <th className="px-5 py-3">No. Polisi</th>
-                    <th className="px-5 py-3">Rute Operasional</th>
-                    <th className="px-5 py-3">Muatan</th>
-                    <th className="px-5 py-3 text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="text-xs divide-y divide-slate-100">
-                  {timesheets.slice(0, 5).map((ts) => (
-                    <tr key={ts.id} className="hover:bg-slate-50/60 transition">
-                      <td className="px-5 py-3.5 font-medium text-slate-700">{ts.driverName}</td>
-                      <td className="px-5 py-3.5 font-bold text-slate-800">{ts.nopol}</td>
-                      <td className="px-5 py-3.5 text-slate-500">
-                        {ts.originLocation} &rarr; {ts.destinationLocation}
-                      </td>
-                      <td className="px-5 py-3.5 text-slate-600">
-                        {ts.cargoDescription} ({ts.cargoTonnageTon}T)
-                      </td>
-                      <td className="px-5 py-3.5 text-center">
-                        <span className={`px-2 py-0.5 rounded-full font-semibold text-[10px] ${
-                          ts.status === 'completed'
-                            ? 'bg-green-50 text-green-700 border border-green-200/60'
-                            : 'bg-blue-50 text-blue-700 border border-blue-200/60'
-                        }`}>
-                          {ts.status === 'completed' ? 'SELESAI' : 'AKTIF'}
-                        </span>
-                      </td>
+            {dashboardTableTab === 'tripsheet' ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-slate-50 text-[10px] uppercase text-slate-400 font-bold border-b border-slate-100">
+                    <tr>
+                      <th className="px-5 py-3">No. Trip / Surat Jalan</th>
+                      <th className="px-5 py-3">Armada &amp; Supir</th>
+                      <th className="px-5 py-3">Rute &amp; Klien</th>
+                      <th className="px-5 py-3">Muatan Kargo</th>
+                      <th className="px-5 py-3">Uang Saku Jalan</th>
+                      <th className="px-5 py-3 text-center">Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="text-xs divide-y divide-slate-100">
+                    {safeTripSheets.slice(0, 5).map((ts) => (
+                      <tr
+                        key={ts.id}
+                        onClick={() => onNavigateTab('tripsheet')}
+                        className="hover:bg-slate-50/80 transition cursor-pointer"
+                      >
+                        <td className="px-5 py-3.5">
+                          <p className="font-bold text-slate-800 font-mono text-[11px]">{ts.tripNumber}</p>
+                          <p className="text-[10px] text-blue-600 font-semibold">{ts.suratJalanNumber}</p>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <p className="font-bold text-slate-800">{ts.nopol}</p>
+                          <p className="text-[11px] text-slate-500">{ts.driverName} {ts.helperName ? `+ ${ts.helperName}` : ''}</p>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <p className="font-semibold text-slate-700">{ts.originLocation} &rarr; {ts.destinationLocation}</p>
+                          <p className="text-[10px] text-slate-400 truncate max-w-[150px]">{ts.clientCompany}</p>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <span className="font-medium text-slate-700">{ts.cargoDescription}</span>
+                          <span className="text-[10px] text-slate-400 block font-mono">({ts.cargoTonnageTon} Ton)</span>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <p className="font-bold font-mono text-emerald-700">{formatRupiah(ts.totalPocketDisbursed)}</p>
+                          <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
+                            ts.pocketSettlementStatus === 'settled'
+                              ? 'bg-green-100 text-green-800'
+                              : ts.pocketSettlementStatus === 'disbursed'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {ts.pocketSettlementStatus === 'settled' ? 'Selesai Settle' : ts.pocketSettlementStatus === 'disbursed' ? 'Sudah Cair' : 'Draft'}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5 text-center">
+                          <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                            ts.status === 'in_transit'
+                              ? 'bg-blue-100 text-blue-800 animate-pulse'
+                              : ts.status === 'completed' || ts.status === 'settled'
+                              ? 'bg-green-100 text-green-800'
+                              : ts.status === 'arrived'
+                              ? 'bg-purple-100 text-purple-800'
+                              : 'bg-slate-100 text-slate-700'
+                          }`}>
+                            {ts.status === 'in_transit' ? 'DALAM JALAN' : ts.status === 'completed' || ts.status === 'settled' ? 'SELESAI' : ts.status === 'arrived' ? 'TIBA' : 'DIJADWALKAN'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                    {safeTripSheets.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="py-6 text-center text-slate-400 text-xs">
+                          Belum ada data Trip Sheet &amp; Surat Jalan.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-slate-50 text-[10px] uppercase text-slate-400 font-bold border-b border-slate-100">
+                    <tr>
+                      <th className="px-5 py-3">Pengemudi</th>
+                      <th className="px-5 py-3">No. Polisi</th>
+                      <th className="px-5 py-3">Rute Operasional</th>
+                      <th className="px-5 py-3">Muatan</th>
+                      <th className="px-5 py-3 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-xs divide-y divide-slate-100">
+                    {safeTimesheets.slice(0, 5).map((ts) => (
+                      <tr key={ts.id} className="hover:bg-slate-50/60 transition">
+                        <td className="px-5 py-3.5 font-medium text-slate-700">{ts.driverName}</td>
+                        <td className="px-5 py-3.5 font-bold text-slate-800">{ts.nopol}</td>
+                        <td className="px-5 py-3.5 text-slate-500">
+                          {ts.originLocation} &rarr; {ts.destinationLocation}
+                        </td>
+                        <td className="px-5 py-3.5 text-slate-600">
+                          {ts.cargoDescription} ({ts.cargoTonnageTon}T)
+                        </td>
+                        <td className="px-5 py-3.5 text-center">
+                          <span className={`px-2 py-0.5 rounded-full font-semibold text-[10px] ${
+                            ts.status === 'completed'
+                              ? 'bg-green-50 text-green-700 border border-green-200/60'
+                              : 'bg-blue-50 text-blue-700 border border-blue-200/60'
+                          }`}>
+                            {ts.status === 'completed' ? 'SELESAI' : 'AKTIF'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                    {safeTimesheets.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="py-6 text-center text-slate-400 text-xs">
+                          Belum ada data time sheet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
 

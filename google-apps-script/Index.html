@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>44S Ops_pro - Sistem Manajemen Operasional Armada & Keuangan</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 0.2; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(1.05); }
+    }
+    .glow-bg { animation: pulse-glow 6s infinite ease-in-out; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between font-sans selection:bg-blue-600 selection:text-white">
+
+  <!-- Glow Background Elements -->
+  <div class="fixed top-0 left-1/4 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none glow-bg"></div>
+  <div class="fixed bottom-0 right-1/4 w-96 h-96 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none glow-bg"></div>
+
+  <!-- Header -->
+  <header class="relative z-10 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 px-6 py-4">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/25">
+          <i class="fa-solid fa-truck-fast text-lg"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-extrabold text-lg tracking-tight text-white">44S Ops<span class="text-blue-400">_pro</span></span>
+            <span class="text-[10px] bg-blue-500/20 text-blue-300 border border-blue-400/30 px-2 py-0.5 rounded-full font-bold uppercase">Google Cloud Apps Script</span>
+          </div>
+          <p class="text-xs text-slate-400">Sistem Terintegrasi Manajemen Operasional Armada Kendaraan</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700 text-xs">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="text-slate-300 font-medium">Spreadsheet Database Ready</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="relative z-10 max-w-7xl mx-auto w-full px-6 py-10 flex-1">
+    
+    <!-- Hero Banner -->
+    <div class="bg-gradient-to-r from-slate-900/90 via-slate-900/60 to-slate-950/90 border border-slate-800 rounded-3xl p-8 mb-8 shadow-2xl relative overflow-hidden">
+      <div class="max-w-3xl">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/15 border border-blue-400/30 text-blue-300 text-xs font-semibold mb-4">
+          <i class="fa-solid fa-sparkles text-blue-400"></i> Backend Google Apps Script Aktif
+        </div>
+        <h1 class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-3">
+          Sinkronisasi &amp; Monitoring Real-Time Armada 44S Ops_pro
+        </h1>
+        <p class="text-slate-400 text-sm leading-relaxed mb-6">
+          Spreadsheet Anda kini berfungsi sebagai database cloud terpusat. Kelola pajak, pengisian solar, ritase supir, pengeluaran kas pool, dan jadwal servis dengan keamanan Google Workspace.
+        </p>
+        
+        <div class="flex flex-wrap items-center gap-3">
+          <button onclick="initDatabase()" id="btnInit" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-blue-600/30 flex items-center gap-2 transition cursor-pointer">
+            <i class="fa-solid fa-database"></i> Setup / Inisialisasi Ulang 9 Sheet
+          </button>
+          <button onclick="loadDataPreview()" id="btnRefresh" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 flex items-center gap-2 transition cursor-pointer">
+            <i class="fa-solid fa-arrows-rotate"></i> Muat Data Terkini
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status Alert Area -->
+    <div id="statusAlert" class="hidden mb-6 p-4 rounded-2xl text-xs font-medium transition"></div>
+
+    <!-- Data Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs text-slate-400 font-bold uppercase">Total Armada</span>
+          <i class="fa-solid fa-truck text-blue-400"></i>
+        </div>
+        <div id="countVehicles" class="text-2xl font-black text-white">6 Unit</div>
+      </div>
+      <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs text-slate-400 font-bold uppercase">Pajak/KIR Tercatat</span>
+          <i class="fa-solid fa-file-invoice text-emerald-400"></i>
+        </div>
+        <div id="countTaxes" class="text-2xl font-black text-white">6 Rekod</div>
+      </div>
+      <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs text-slate-400 font-bold uppercase">Log Solar BBM</span>
+          <i class="fa-solid fa-gas-pump text-amber-400"></i>
+        </div>
+        <div id="countFuel" class="text-2xl font-black text-white">6 Entri</div>
+      </div>
+      <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs text-slate-400 font-bold uppercase">Kas &amp; Pengeluaran</span>
+          <i class="fa-solid fa-wallet text-purple-400"></i>
+        </div>
+        <div id="countFinance" class="text-2xl font-black text-white">10 Transaksi</div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="relative z-10 border-t border-slate-900 bg-slate-950 px-6 py-4 text-center text-xs text-slate-500">
+    &copy; 2026 44S Ops_pro Enterprise &bull; Google Apps Script Integration Engine.
+  </footer>
+
+  <script>
+    function showStatus(msg, isSuccess) {
+      var el = document.getElementById('statusAlert');
+      el.className = isSuccess 
+        ? 'mb-6 p-4 rounded-2xl text-xs font-medium bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 block'
+        : 'mb-6 p-4 rounded-2xl text-xs font-medium bg-rose-500/10 border border-rose-500/30 text-rose-300 block';
+      el.innerHTML = msg;
+    }
+
+    function initDatabase() {
+      var btn = document.getElementById('btnInit');
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyiapkan Database...';
+      btn.disabled = true;
+
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler(function(res) {
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> Selesai!';
+            showStatus(res.message, true);
+            loadDataPreview();
+            setTimeout(function() {
+              btn.innerHTML = '<i class="fa-solid fa-database"></i> Setup / Inisialisasi Ulang 9 Sheet';
+              btn.disabled = false;
+            }, 2500);
+          })
+          .withFailureHandler(function(err) {
+            btn.innerHTML = '<i class="fa-solid fa-database"></i> Setup / Inisialisasi Ulang 9 Sheet';
+            btn.disabled = false;
+            showStatus('Gagal: ' + err.message, false);
+          })
+          .initSheetsDatabase();
+      } else {
+        showStatus('Inisialisasi berhasil disimulasikan.', true);
+        btn.innerHTML = '<i class="fa-solid fa-database"></i> Setup / Inisialisasi Ulang 9 Sheet';
+        btn.disabled = false;
+      }
+    }
+
+    function loadDataPreview() {
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (res && res.data) {
+              document.getElementById('countVehicles').innerText = (res.data.vehicles || 6) + ' Unit';
+              document.getElementById('countTaxes').innerText = (res.data.taxes || 6) + ' Rekod';
+              document.getElementById('countFuel').innerText = (res.data.fuel || 6) + ' Entri';
+              document.getElementById('countFinance').innerText = (res.data.finance || 10) + ' Transaksi';
+            }
+          })
+          .getDashboardSummary();
+      }
+    }
+
+    window.onload = function() {
+      loadDataPreview();
+    };
+  </script>
+</body>
+</html>

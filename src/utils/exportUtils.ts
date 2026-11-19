@@ -695,6 +695,7 @@ export const exportVehiclesToExcel = (
     'No': idx + 1,
     'ID Unit': v.id,
     'No. Polisi': v.nopol,
+    'Pemilik Aset / Perusahaan': v.ownerCompany || 'PT Transindo Logistik',
     'Merk / Tipe': `${v.brand} ${v.model}`,
     'Jenis Armada': v.type,
     'Tahun': v.year,
@@ -716,7 +717,7 @@ export const exportVehiclesToExcel = (
   XLSX.utils.book_append_sheet(wb, ws, 'Master_Armada');
 
   ws['!cols'] = [
-    { wch: 5 }, { wch: 12 }, { wch: 14 }, { wch: 22 }, { wch: 18 },
+    { wch: 5 }, { wch: 12 }, { wch: 14 }, { wch: 24 }, { wch: 22 }, { wch: 18 },
     { wch: 8 }, { wch: 14 }, { wch: 18 }, { wch: 14 }, { wch: 14 },
     { wch: 20 }, { wch: 16 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 20 }
   ];
@@ -731,7 +732,7 @@ export const exportVehiclesToPDF = (
   const doc = new jsPDF('landscape', 'mm', 'a4');
   drawPdfHeader(
     doc,
-    'Laporan Master Database Armada Kendaraan Operasional',
+    'Laporan Master Database Armada Kendaraan Operasional & Aset Perusahaan',
     `Total Terdaftar: ${vehicles.length} Unit Armada`,
     dateRangeText
   );
@@ -739,6 +740,7 @@ export const exportVehiclesToPDF = (
   const bodyData = vehicles.map((v, idx) => [
     idx + 1,
     v.nopol,
+    v.ownerCompany || 'PT Transindo Logistik',
     `${v.brand} ${v.model}`,
     v.type,
     v.year,
@@ -753,12 +755,12 @@ export const exportVehiclesToPDF = (
   autoTable(doc, {
     startY: 46,
     head: [[
-      'No', 'No. Polisi', 'Merk / Model', 'Jenis', 'Tahun',
+      'No', 'No. Polisi', 'Pemilik / Perusahaan Aset', 'Merk / Model', 'Jenis', 'Tahun',
       'Bahan Bakar', 'Odometer', 'Pengemudi', 'Pajak STNK', 'KIR Dishub', 'Status'
     ]],
     body: bodyData,
     foot: [[
-      '', 'TOTAL ARMADA', `${vehicles.length} UNIT`, '', '', '', '', '', '', '', ''
+      '', 'TOTAL ARMADA', `${vehicles.length} UNIT`, '', '', '', '', '', '', '', '', ''
     ]],
     styles: { fontSize: 8, cellPadding: 2 },
     headStyles: { fillColor: [30, 58, 138], textColor: 255, fontStyle: 'bold' },
@@ -794,7 +796,6 @@ export const exportDriversToExcel = (
     'Golongan SIM': d.simType,
     'No. SIM': d.simNumber,
     'Masa Berlaku SIM': d.simExpiry,
-    'Tgl Bergabung': d.joinDate,
     'Status Tugas': d.status
   }));
 
@@ -804,7 +805,7 @@ export const exportDriversToExcel = (
 
   ws['!cols'] = [
     { wch: 5 }, { wch: 12 }, { wch: 22 }, { wch: 20 }, { wch: 18 },
-    { wch: 16 }, { wch: 20 }, { wch: 16 }, { wch: 16 }, { wch: 14 }
+    { wch: 16 }, { wch: 20 }, { wch: 16 }, { wch: 14 }
   ];
 
   XLSX.writeFile(wb, `Master_Data_Driver_${new Date().toISOString().split('T')[0]}.xlsx`);
@@ -829,18 +830,17 @@ export const exportDriversToPDF = (
     d.simType,
     d.simNumber,
     formatDateIndo(d.simExpiry),
-    formatDateIndo(d.joinDate),
-    d.status.toUpperCase()
+    d.status === 'active' ? 'AKTIF' : d.status === 'on_duty' ? 'SEDANG JALAN' : 'NONAKTIF'
   ]);
 
   autoTable(doc, {
     startY: 46,
     head: [[
-      'No', 'Nama Pengemudi', 'No. WhatsApp', 'Gol SIM', 'No. SIM', 'Masa Berlaku', 'Bergabung', 'Status'
+      'No', 'Nama Pengemudi', 'No. WhatsApp', 'Gol SIM', 'No. SIM', 'Masa Berlaku SIM', 'Status'
     ]],
     body: bodyData,
     foot: [[
-      '', 'TOTAL PENGEMUDI', `${drivers.length} Orang`, '', '', '', '', ''
+      '', 'TOTAL PENGEMUDI', `${drivers.length} Orang`, '', '', '', ''
     ]],
     styles: { fontSize: 8.5, cellPadding: 2.5 },
     headStyles: { fillColor: [55, 65, 81], textColor: 255, fontStyle: 'bold' },
@@ -849,7 +849,7 @@ export const exportDriversToPDF = (
     columnStyles: {
       0: { halign: 'center', cellWidth: 10 },
       1: { fontStyle: 'bold' },
-      7: { halign: 'center', fontStyle: 'bold' }
+      6: { halign: 'center', fontStyle: 'bold' }
     }
   });
 

@@ -7,25 +7,40 @@ import {
   Trash2,
   Edit2,
   X,
-  Lock
+  Lock,
+  Eye,
+  FileText,
+  Receipt,
+  Package
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { MaintenanceRecord, Vehicle, ServiceType, SparepartItem, UserRole } from '../../types';
+import { MaintenanceRecord, Vehicle, ServiceType, SparepartItem, UserRole, ServiceTypeReference, Driver, SparepartInventoryItem } from '../../types';
 import {
   formatRupiah,
   formatNumber,
   formatDateIndo
 } from '../../utils/formatters';
 import { exportMaintenanceToExcel, exportMaintenanceToPDF } from '../../utils/exportUtils';
+import { printElementById } from '../../utils/slipPrint';
 import { ModuleFilterExportBar } from '../Common/ModuleFilterExportBar';
 import { getRolePermissions } from '../../utils/permissions';
 import { RoleRestrictedBanner } from '../Common/RoleRestrictedBanner';
+import { TablePagination } from '../Common/TablePagination';
+import { ReceiptUploadField } from '../Common/ReceiptUploadField';
+import { PrintOutPreviewStage } from '../Common/PrintPreviewControls';
+import { ModuleAnalyticsPanel } from '../Common/ModuleAnalyticsPanel';
+import { BarChart3, ListFilter } from 'lucide-react';
+import { confirmDelete } from '../../utils/dialogService';
 
 interface MaintenanceManagerProps {
   maintenance: MaintenanceRecord[];
   vehicles: Vehicle[];
+  drivers?: Driver[];
+  serviceTypes?: ServiceTypeReference[];
+  sparepartInventory?: SparepartInventoryItem[];
   userRole?: UserRole;
   onOpenRoleMatrix?: () => void;
+  onNavigateToInventory?: () => void;
   onAddMaintenance: (m: MaintenanceRecord) => void;
   onUpdateMaintenance?: (m: MaintenanceRecord) => void;
   onDeleteMaintenance: (id: string) => void;
@@ -34,28 +49,68 @@ interface MaintenanceManagerProps {
 export const MaintenanceManager: React.FC<MaintenanceManagerProps> = ({
   maintenance = [],
   vehicles = [],
+  drivers = [],
+  serviceTypes = [],
+  sparepartInventory = [],
   userRole = 'owner',
   onOpenRoleMatrix,
+  onNavigateToInventory,
   onAddMaintenance,
   onUpdateMaintenance,
   onDeleteMaintenance
 }) => {
   const safeMaintenance = Array.isArray(maintenance) ? maintenance : [];
   const safeVehicles = Array.isArray(vehicles) ? vehicles : [];
+  const safeDrivers = Array.isArray(drivers) ? drivers : [];
+  const safeInventory = Array.isArray(sparepartInventory) ? sparepartInventory : [];
   const perms = getRolePermissions(userRole);
+  const [moduleView, setModuleView] = useState<'data' | 'analytics'>('data');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedVehicle, setSelectedVehicle] = useState('all');
+  const [selectedCompany, setSelectedCompany] = useState<string>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+
+  const getMaintCompany = (m: MaintenanceRecord) => {
+    const v = safeVehicles.find(veh => veh.id === m.vehicleId || veh.nopol === m.nopol);
+    return v?.ownerCompany || 'Perusahaan Umum / Lainnya';
+  };
+
+  const companies = Array.from(
+    new Set([
+      ...safeVehicles.map(v => v.ownerCompany).filter(Boolean),
+      ...safeMaintenance.map(m => getMaintCompany(m)).filter(Boolean)
+    ])
+  );
+
+  const companySummaries = companies.map((comp) => {
+    const compMaint = safeMaintenance.filter((m) => {
+      if (!m) return false;
+      if (startDate && m.serviceDate < startDate) return false;
+      if (endDate && m.serviceDate > endDate) return false;
+      return getMaintCompany(m) === comp;
+    });
+    return {
+      companyName: comp,
+      count: compMaint.length,
+      totalExpense: compMaint.reduce((sum, m) => sum + (m.totalCost || 0), 0),
+    };
+  });
+  
+  // Pagination State (Next Halaman)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedSpk, setSelectedSpk] = useState<MaintenanceRecord | null>(null);
   const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
+  const [inspectedReceiptRecord, setInspectedReceiptRecord] = useState<MaintenanceRecord | null>(null);
 
   // Form state (Add)
   const [selectedVehicleId, setSelectedVehicleId] = useState(safeVehicles[0]?.id || '');
+  const [driverName, setDriverName] = useState(safeVehicles[0]?.assignedDriver || safeDrivers[0]?.name || '');
   const [serviceDate, setServiceDate] = useState('2026-08-21');
   const [currentOdo, setCurrentOdo] = useState<number>(safeVehicles[0]?.currentOdometer || 0);
   const [nextServiceOdo, setNextServiceOdo] = useState<number>((safeVehicles[0]?.currentOdometer || 0) + 5000);
@@ -67,6 +122,7 @@ export const MaintenanceManager: React.FC<MaintenanceManagerProps> = ({
   const [laborCost, setLaborCost] = useState<number>(200000);
   const [status, setStatus] = useState<'completed' | 'in_progress' | 'scheduled'>('completed');
   const [notes, setNotes] = useState('');
+  const [receiptProofUrl, setReceiptProofUrl] = useState('');
 
   const [spareparts, setSpareparts] = useState<SparepartItem[]>([
     { id: 'SP-1', name: 'Oli Mesin Meditran SX 15W-40', qty: 16, unit: 'Liter', unitPrice: 55000, totalPrice: 880000 },
@@ -77,6 +133,7 @@ export const MaintenanceManager: React.FC<MaintenanceManagerProps> = ({
   const [editFormData, setEditFormData] = useState({
     id: '',
     vehicleId: '',
+    driverName: '',
     serviceDate: '',
     serviceType: 'Ganti Oli Mesin & Filter Oli' as ServiceType,
     workshopName: '',
@@ -88,6 +145,7 @@ export const MaintenanceManager: React.FC<MaintenanceManagerProps> = ({
     laborCost: 0,
     status: 'completed' as 'completed' | 'in_progress' | 'scheduled',
     notes: '',
+    receiptProofUrl: '',
     spareparts: [] as SparepartItem[]
   });
 
@@ -95,6 +153,7 @@ export const MaintenanceManager: React.FC<MaintenanceManagerProps> = ({
     setSelectedVehicleId(vId);
     const v = vehicles.find(veh => veh.id === vId);
     if (v) {
+      setDriverName(v.assignedDriver || '');
       setCurrentOdo(v.currentOdometer);
       setNextServiceOdo(v.currentOdometer + 5000);
     }
@@ -155,20 +214,27 @@ export const MaintenanceManager: React.FC<MaintenanceManagerProps> = ({
 
   const filteredMaintenance = safeMaintenance.filter((m) => {
     if (!m) return false;
+    const compName = getMaintCompany(m);
     const q = (searchQuery || '').toLowerCase();
     const matchesSearch =
       (m.nopol || '').toLowerCase().includes(q) ||
       (m.serviceType || '').toLowerCase().includes(q) ||
       (m.workshopName || '').toLowerCase().includes(q) ||
-      ((m.workOrderNumber || '').toLowerCase().includes(q));
+      ((m.workOrderNumber || '').toLowerCase().includes(q)) ||
+      compName.toLowerCase().includes(q);
     const matchesVehicle = selectedVehicle === 'all' || m.vehicleId === selectedVehicle || m.nopol === selectedVehicle;
+    const matchesCompany = selectedCompany === 'all' || compName === selectedCompany;
 
     // Date range filter
     const matchesStartDate = !startDate || m.serviceDate >= startDate;
     const matchesEndDate = !endDate || m.serviceDate <= endDate;
 
-    return matchesSearch && matchesVehicle && matchesStartDate && matchesEndDate;
+    return matchesSearch && matchesVehicle && matchesCompany && matchesStartDate && matchesEndDate;
   });
+
+  // Paginated Maintenance Records for Next / Prev Pages
+  const totalFilteredMaintenance = filteredMaintenance.length;
+  const paginatedMaintenance = filteredMaintenance.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const dateRangeText = startDate && endDate
     ? `${startDate} s/d ${endDate}`
@@ -192,11 +258,15 @@ export const MaintenanceManager: React.FC<MaintenanceManagerProps> = ({
     e.preventDefault();
     const v = safeVehicles.find(veh => veh.id === selectedVehicleId);
     const nopol = v ? v.nopol : 'B 0000 XX';
+    const matchedDrv = safeDrivers.find(d => d.name.toLowerCase() === (driverName || '').toLowerCase());
 
     const newRecord: MaintenanceRecord = {
       id: 'MN-' + Date.now().toString().slice(-4),
       vehicleId: selectedVehicleId,
       nopol,
+      driverId: matchedDrv?.id,
+      driverName: driverName || v?.assignedDriver || '',
+      driverNip: matchedDrv?.nip,
       serviceDate,
       serviceType,
       workshopName,
@@ -209,19 +279,23 @@ export const MaintenanceManager: React.FC<MaintenanceManagerProps> = ({
       totalCost: grandTotalCost,
       spareparts,
       status,
-      notes
+      notes,
+      receiptProofUrl: receiptProofUrl || undefined
     };
 
     onAddMaintenance(newRecord);
+    setReceiptProofUrl('');
     setIsModalOpen(false);
     confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
   };
 
   const handleOpenEdit = (m: MaintenanceRecord) => {
+    const v = safeVehicles.find(veh => veh.id === m.vehicleId || veh.nopol === m.nopol);
     setSelectedRecord(m);
     setEditFormData({
       id: m.id,
       vehicleId: m.vehicleId,
+      driverName: m.driverName || v?.assignedDriver || '',
       serviceDate: m.serviceDate,
       serviceType: m.serviceType,
       workshopName: m.workshopName,
@@ -233,6 +307,7 @@ export const MaintenanceManager: React.FC<MaintenanceManagerProps> = ({
       laborCost: m.laborCost,
       status: m.status,
       notes: m.notes || '',
+      receiptProofUrl: m.receiptProofUrl || '',
       spareparts: m.spareparts ? [...m.spareparts] : []
     });
     setIsEditModalOpen(true);
@@ -244,11 +319,15 @@ export const MaintenanceManager: React.FC<MaintenanceManagerProps> = ({
 
     const v = vehicles.find(veh => veh.id === editFormData.vehicleId);
     const nopol = v ? v.nopol : selectedRecord.nopol;
+    const matchedDrv = safeDrivers.find(d => d.name.toLowerCase() === (editFormData.driverName || '').toLowerCase());
 
     const updated: MaintenanceRecord = {
       ...selectedRecord,
       vehicleId: editFormData.vehicleId,
       nopol,
+      driverId: matchedDrv?.id || selectedRecord.driverId,
+      driverName: editFormData.driverName || selectedRecord.driverName,
+      driverNip: matchedDrv?.nip || selectedRecord.driverNip,
       serviceDate: editFormData.serviceDate,
       serviceType: editFormData.serviceType,
       workshopName: editFormData.workshopName,
@@ -262,7 +341,8 @@ export const MaintenanceManager: React.FC<MaintenanceManagerProps> = ({
       totalCost: editGrandTotal,
       spareparts: editFormData.spareparts,
       status: editFormData.status,
-      notes: editFormData.notes
+      notes: editFormData.notes,
+      receiptProofUrl: editFormData.receiptProofUrl || undefined
     };
 
     onUpdateMaintenance(updated);
@@ -294,25 +374,78 @@ export const MaintenanceManager: React.FC<MaintenanceManagerProps> = ({
             Pencatatan Surat Perintah Kerja (SPK), riwayat servis suku cadang, dan jadwal servis berkala
           </p>
         </div>
-        {perms.canAddMaintenance ? (
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-lg shadow-xs active:scale-95 transition"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Buat SPK Servis</span>
-          </button>
-        ) : (
-          <button
-            disabled
-            className="flex items-center gap-2 px-3.5 py-2 bg-slate-100 text-slate-400 font-medium text-xs rounded-lg cursor-not-allowed border border-slate-200"
-            title="Akses dibatasi sesuai peran pengguna"
-          >
-            <Lock className="w-3.5 h-3.5" />
-            <span>Buat SPK (Terkunci)</span>
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* View Mode Toggle: Data vs Analytics */}
+          <div className="flex items-center gap-1 bg-slate-200/70 p-1 rounded-xl border border-slate-200 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setModuleView('data')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                moduleView === 'data'
+                  ? 'bg-white text-blue-700 shadow-xs border border-slate-200/80'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <ListFilter className="w-3.5 h-3.5" />
+              <span>Daftar SPK Servis</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setModuleView('analytics')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                moduleView === 'analytics'
+                  ? 'bg-indigo-600 text-white shadow-xs border border-indigo-700'
+                  : 'text-indigo-700 hover:bg-indigo-50'
+              }`}
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>Laporan &amp; Analitik Bengkel</span>
+            </button>
+          </div>
+
+          {onNavigateToInventory && (
+            <button
+              type="button"
+              onClick={onNavigateToInventory}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-xs transition cursor-pointer"
+            >
+              <Package className="w-4 h-4" />
+              <span>Gudang Sparepart Baru &amp; Bekas ({safeInventory.length})</span>
+            </button>
+          )}
+
+          {perms.canAddMaintenance ? (
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-lg shadow-xs active:scale-95 transition"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Buat SPK Servis</span>
+            </button>
+          ) : (
+            <button
+              disabled
+              className="flex items-center gap-2 px-3.5 py-2 bg-slate-100 text-slate-400 font-medium text-xs rounded-lg cursor-not-allowed border border-slate-200"
+              title="Akses dibatasi sesuai peran pengguna"
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span>Buat SPK (Terkunci)</span>
+            </button>
+          )}
+        </div>
       </div>
+
+      {moduleView === 'analytics' ? (
+        <ModuleAnalyticsPanel
+          moduleType="maintenance"
+          title="Laporan & Analitik Perawatan Berkala & SPK Bengkel"
+          subtitle="Analisis proporsi biaya suku cadang (sparepart) vs ongkos jasa mekanik per armada & bengkel rekanan"
+          maintenance={safeMaintenance}
+          vehicles={safeVehicles}
+          drivers={safeDrivers}
+        />
+      ) : (
+      <>
 
       {/* Summary KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -349,6 +482,13 @@ export const MaintenanceManager: React.FC<MaintenanceManagerProps> = ({
         totalFilteredCount={filteredMaintenance.length}
         totalAllCount={maintenance.length}
         moduleLabel="Riwayat Servis"
+        companies={companies}
+        selectedCompany={selectedCompany}
+        onCompanyChange={(val) => {
+          setSelectedCompany(val);
+          setCurrentPage(1);
+        }}
+        companySummaries={companySummaries}
       >
         <div className="relative w-full md:w-64">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -356,14 +496,20 @@ export const MaintenanceManager: React.FC<MaintenanceManagerProps> = ({
             type="text"
             placeholder="Cari SPK, Nopol, jenis servis, bengkel..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
             className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-4 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-blue-500 focus:bg-white"
           />
         </div>
 
         <select
           value={selectedVehicle}
-          onChange={(e) => setSelectedVehicle(e.target.value)}
+          onChange={(e) => {
+            setSelectedVehicle(e.target.value);
+            setCurrentPage(1);
+          }}
           className="w-full md:w-auto bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-hidden focus:border-blue-500 font-medium"
         >
           <option value="all">Semua Armada</option>
@@ -389,7 +535,7 @@ export const MaintenanceManager: React.FC<MaintenanceManagerProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredMaintenance.map((m) => (
+              {paginatedMaintenance.map((m) => (
                 <tr key={m.id} className="hover:bg-slate-50/60 transition">
                   <td className="py-3.5 px-5">
                     <p className="font-bold text-slate-800">{formatDateIndo(m.serviceDate)}</p>
@@ -398,6 +544,17 @@ export const MaintenanceManager: React.FC<MaintenanceManagerProps> = ({
                   <td className="py-3.5 px-5">
                     <p className="font-mono font-bold text-slate-800">{m.nopol}</p>
                     <p className="text-[11px] text-slate-500">{m.workshopName}</p>
+                    {(() => {
+                      const v = safeVehicles.find(veh => veh.id === m.vehicleId || veh.nopol === m.nopol);
+                      const drvName = m.driverName || v?.assignedDriver;
+                      const matchedDrv = safeDrivers.find(d => d.name.toLowerCase() === (drvName || '').toLowerCase());
+                      const nip = m.driverNip || matchedDrv?.nip;
+                      return drvName ? (
+                        <p className="text-[10px] text-emerald-700 font-semibold mt-0.5">
+                          PJ Serah Terima: {drvName} {nip ? `(${nip})` : ''}
+                        </p>
+                      ) : null;
+                    })()}
                   </td>
                   <td className="py-3.5 px-5">
                     <p className="font-medium text-slate-800">{m.serviceType}</p>
@@ -411,14 +568,26 @@ export const MaintenanceManager: React.FC<MaintenanceManagerProps> = ({
                     {formatRupiah(m.totalCost)}
                   </td>
                   <td className="py-3.5 px-5 text-center">
-                    <button
-                      onClick={() => setSelectedSpk(m)}
-                      className="px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-medium inline-flex items-center gap-1 transition"
-                      title="Lihat Cetak SPK"
-                    >
-                      <Printer className="w-3 h-3 text-blue-600" />
-                      <span>SPK</span>
-                    </button>
+                    <div className="flex items-center justify-center gap-1">
+                      <button
+                        onClick={() => setSelectedSpk(m)}
+                        className="px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-medium inline-flex items-center gap-1 transition"
+                        title="Lihat Cetak SPK"
+                      >
+                        <Printer className="w-3 h-3 text-blue-600" />
+                        <span>SPK</span>
+                      </button>
+                      {m.receiptProofUrl && (
+                        <button
+                          onClick={() => setInspectedReceiptRecord(m)}
+                          className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition"
+                          title="Lihat Nota Bengkel"
+                        >
+                          <Eye className="w-3 h-3" />
+                          <span>Nota</span>
+                        </button>
+                      )}
+                    </div>
                   </td>
                   <td className="py-3.5 px-5 text-right">
                     <div className="flex items-center justify-end gap-1.5">
@@ -433,8 +602,10 @@ export const MaintenanceManager: React.FC<MaintenanceManagerProps> = ({
                       )}
                       {perms.canDeleteMaintenance && (
                         <button
-                          onClick={() => {
-                            if (confirm(`Hapus riwayat servis ${m.workOrderNumber} (${m.nopol})?`)) onDeleteMaintenance(m.id);
+                          onClick={async () => {
+                            if (await confirmDelete(`Riwayat Servis ${m.workOrderNumber}`, 'Apakah Anda Yakin Ingin Menghapus Data?', `Armada: ${m.nopol} • Tanggal: ${m.date}`)) {
+                              onDeleteMaintenance(m.id);
+                            }
                           }}
                           className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg border border-slate-200 transition"
                           title="Hapus riwayat servis"
@@ -456,82 +627,139 @@ export const MaintenanceManager: React.FC<MaintenanceManagerProps> = ({
             </tbody>
           </table>
         </div>
+
+        {/* Table Pagination with Next / Prev */}
+        <TablePagination
+          currentPage={currentPage}
+          totalItems={totalFilteredMaintenance}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+          pageSizeOptions={[5, 10, 20, 50]}
+          itemLabel="riwayat servis bengkel"
+        />
       </div>
+      </>
+      )}
 
       {/* SPK View / Print Modal */}
       {selectedSpk && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
-          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg shadow-xl overflow-hidden p-6 animate-in fade-in zoom-in-95 space-y-4 text-xs">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="font-bold text-base text-slate-800">SURAT PERINTAH KERJA (SPK)</h3>
-                <p className="text-[10px] text-slate-400 font-mono">{selectedSpk.workOrderNumber}</p>
-              </div>
-              <button onClick={() => setSelectedSpk(null)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
-              <div>
-                <p className="text-slate-400 text-[10px]">No. Polisi Unit</p>
-                <p className="font-mono font-bold text-slate-800">{selectedSpk.nopol}</p>
-              </div>
-              <div>
-                <p className="text-slate-400 text-[10px]">Tanggal Servis</p>
-                <p className="font-bold text-slate-800">{formatDateIndo(selectedSpk.serviceDate)}</p>
-              </div>
-              <div>
-                <p className="text-slate-400 text-[10px]">Bengkel Rekanan</p>
-                <p className="font-medium text-slate-800">{selectedSpk.workshopName}</p>
-              </div>
-              <div>
-                <p className="text-slate-400 text-[10px]">Mekanik Penanggungjawab</p>
-                <p className="font-medium text-slate-800">{selectedSpk.mechanicName || '-'}</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto printable-slip-modal">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 my-auto printable-slip-card">
+            <div className="flex items-center justify-between px-6 py-3.5 border-b border-slate-100 bg-slate-50 print:hidden print-hide">
+              <span className="text-xs font-bold text-slate-800">Pratinjau Cetak SPK Bengkel</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    printElementById(
+                      'printable-spk-doc',
+                      `SPK_${selectedSpk.workOrderNumber}`
+                    )
+                  }
+                  className="px-3.5 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 inline-flex items-center gap-1.5 shadow-xs"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Cetak Lembar SPK</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedSpk(null)}
+                  className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
-            <div>
-              <p className="font-semibold text-slate-700 mb-1">Rincian Pekerjaan &amp; Sparepart:</p>
-              <table className="w-full text-[11px] border border-slate-200 rounded-lg overflow-hidden">
-                <thead className="bg-slate-100 text-slate-600">
-                  <tr>
-                    <th className="p-2 text-left">Deskripsi</th>
-                    <th className="p-2 text-center">Qty</th>
-                    <th className="p-2 text-right">Harga</th>
-                    <th className="p-2 text-right">Total</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {selectedSpk.spareparts?.map((sp, i) => (
-                    <tr key={i}>
-                      <td className="p-2">{sp.name}</td>
-                      <td className="p-2 text-center">{sp.qty} {sp.unit}</td>
-                      <td className="p-2 text-right font-mono">{formatRupiah(sp.unitPrice)}</td>
-                      <td className="p-2 text-right font-mono font-semibold">{formatRupiah(sp.totalPrice)}</td>
-                    </tr>
-                  ))}
-                  <tr>
-                    <td colSpan={3} className="p-2 font-medium text-slate-600">Ongkos Jasa Mekanik</td>
-                    <td className="p-2 text-right font-mono font-semibold">{formatRupiah(selectedSpk.laborCost)}</td>
-                  </tr>
-                  <tr className="bg-blue-50 font-bold">
-                    <td colSpan={3} className="p-2 text-blue-900">GRAND TOTAL BIAYA SERVIS</td>
-                    <td className="p-2 text-right font-mono text-blue-900">{formatRupiah(selectedSpk.totalCost)}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            <PrintOutPreviewStage
+              documentLabel={`SPK BENGKEL: ${selectedSpk.workOrderNumber}`}
+            >
+              <div id="printable-spk-doc" className="p-6 space-y-4 text-xs bg-white text-slate-900">
+                <div className="flex items-center justify-between border-b-2 border-slate-900 pb-3">
+                  <div>
+                    <h3 className="font-bold text-base text-slate-900">SURAT PERINTAH KERJA (SPK)</h3>
+                    <p className="text-[10px] text-slate-500 font-mono">{selectedSpk.workOrderNumber}</p>
+                  </div>
+                  <div className="text-right text-[10px] text-slate-500 font-mono">
+                    44S OPS_PRO WORKSHOP
+                  </div>
+                </div>
 
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                onClick={() => window.print()}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 inline-flex items-center gap-1.5 shadow-xs"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                <span>Cetak Lembar SPK</span>
-              </button>
-            </div>
+                <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  <div>
+                    <p className="text-slate-400 text-[10px]">No. Polisi Unit</p>
+                    <p className="font-mono font-bold text-slate-800">{selectedSpk.nopol}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 text-[10px]">Tanggal Servis</p>
+                    <p className="font-bold text-slate-800">{formatDateIndo(selectedSpk.serviceDate)}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 text-[10px]">Bengkel Rekanan</p>
+                    <p className="font-medium text-slate-800">{selectedSpk.workshopName}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 text-[10px]">Mekanik Penanggungjawab</p>
+                    <p className="font-medium text-slate-800">{selectedSpk.mechanicName || '-'}</p>
+                  </div>
+                  <div className="col-span-2 pt-1.5 border-t border-slate-200/70">
+                    <p className="text-slate-400 text-[10px]">Karyawan Driver Penyerah Unit (Serah Terima Bengkel)</p>
+                    <p className="font-bold text-emerald-800">
+                      {selectedSpk.driverName || safeVehicles.find(v => v.id === selectedSpk.vehicleId)?.assignedDriver || '-'}
+                      {selectedSpk.driverNip ? ` (${selectedSpk.driverNip})` : ''}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="font-semibold text-slate-700 mb-1">Rincian Pekerjaan &amp; Sparepart:</p>
+                  <table className="w-full text-[11px] border border-slate-200 rounded-lg overflow-hidden">
+                    <thead className="bg-slate-100 text-slate-600">
+                      <tr>
+                        <th className="p-2 text-left">Deskripsi</th>
+                        <th className="p-2 text-center">Qty</th>
+                        <th className="p-2 text-right">Harga</th>
+                        <th className="p-2 text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {selectedSpk.spareparts?.map((sp, i) => (
+                        <tr key={i}>
+                          <td className="p-2">{sp.name}</td>
+                          <td className="p-2 text-center">{sp.qty} {sp.unit}</td>
+                          <td className="p-2 text-right font-mono">{formatRupiah(sp.unitPrice)}</td>
+                          <td className="p-2 text-right font-mono font-semibold">{formatRupiah(sp.totalPrice)}</td>
+                        </tr>
+                      ))}
+                      <tr>
+                        <td colSpan={3} className="p-2 font-medium text-slate-600">Ongkos Jasa Mekanik</td>
+                        <td className="p-2 text-right font-mono font-semibold">{formatRupiah(selectedSpk.laborCost)}</td>
+                      </tr>
+                      <tr className="bg-blue-50 font-bold">
+                        <td colSpan={3} className="p-2 text-blue-900">GRAND TOTAL BIAYA SERVIS</td>
+                        <td className="p-2 text-right font-mono text-blue-900">{formatRupiah(selectedSpk.totalCost)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="grid grid-cols-2 pt-3 text-center text-xs">
+                  <div>
+                    <p className="text-slate-500">Diserahkan Oleh (Karyawan Driver),</p>
+                    <div className="h-14"></div>
+                    <p className="font-bold underline">
+                      {selectedSpk.driverName || safeVehicles.find(v => v.id === selectedSpk.vehicleId)?.assignedDriver || '(.........................)'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500">Diterima Oleh (Kepala Bengkel / Mekanik),</p>
+                    <div className="h-14"></div>
+                    <p className="font-bold underline">{selectedSpk.mechanicName || selectedSpk.workshopName}</p>
+                  </div>
+                </div>
+              </div>
+            </PrintOutPreviewStage>
           </div>
         </div>
       )}
@@ -569,6 +797,24 @@ export const MaintenanceManager: React.FC<MaintenanceManagerProps> = ({
                 </div>
 
                 <div>
+                  <label className="text-slate-700 font-semibold block mb-1">Karyawan Driver Penyerah Unit *</label>
+                  <select
+                    value={driverName}
+                    onChange={(e) => setDriverName(e.target.value)}
+                    className="w-full bg-emerald-50/40 border border-emerald-200 rounded-lg px-3 py-2 text-slate-800 font-semibold focus:outline-hidden focus:border-emerald-500"
+                  >
+                    {safeDrivers.map((d) => (
+                      <option key={d.id} value={d.name}>
+                        [{d.nip || d.id}] {d.name} ({d.assignedVehicle || 'Pool'})
+                      </option>
+                    ))}
+                    {driverName && !safeDrivers.some(d => d.name === driverName) && (
+                      <option value={driverName}>{driverName}</option>
+                    )}
+                  </select>
+                </div>
+
+                <div>
                   <label className="text-slate-700 font-semibold block mb-1">Tanggal Masuk Servis</label>
                   <input
                     type="date"
@@ -583,16 +829,36 @@ export const MaintenanceManager: React.FC<MaintenanceManagerProps> = ({
                   <label className="text-slate-700 font-semibold block mb-1">Jenis Servis / Pemeliharaan *</label>
                   <select
                     value={serviceType}
-                    onChange={(e) => setServiceType(e.target.value as ServiceType)}
+                    onChange={(e) => {
+                      const val = e.target.value as ServiceType;
+                      setServiceType(val);
+                      const matched = serviceTypes.find(s => s.name === val);
+                      if (matched && matched.defaultIntervalKm) {
+                        setNextServiceOdo(currentOdo + matched.defaultIntervalKm);
+                      }
+                      if (matched && matched.estimatedCost && laborCost === 200000) {
+                        setLaborCost(matched.estimatedCost);
+                      }
+                    }}
                     className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-hidden focus:border-blue-500 font-medium"
                   >
-                    <option value="Ganti Oli Mesin & Filter Oli">Ganti Oli Mesin &amp; Filter Oli</option>
-                    <option value="Servis Rem & Kampas Rem">Servis Rem &amp; Kampas Rem</option>
-                    <option value="Ganti Ban Luar / Rotasi Ban">Ganti Ban Luar / Rotasi Ban</option>
-                    <option value="Tune-up Mesin & Kalibrasi Injektor">Tune-up Mesin &amp; Kalibrasi Injektor</option>
-                    <option value="Perbaikan Sistem Kaki-kaki & Suspensi">Perbaikan Kaki-kaki &amp; Suspensi</option>
-                    <option value="Overhaul Mesin (Turun Mesin)">Overhaul Mesin (Turun Mesin)</option>
-                    <option value="Perbaikan Body & Las">Perbaikan Body &amp; Las</option>
+                    {serviceTypes.length > 0 ? (
+                      serviceTypes.filter(s => s.isActive).map(st => (
+                        <option key={st.id} value={st.name}>
+                          {st.name} ({st.defaultIntervalKm.toLocaleString()} KM)
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="Ganti Oli Mesin & Filter Oli">Ganti Oli Mesin &amp; Filter Oli</option>
+                        <option value="Pemeriksaan Sistem Rem & Ganti Kampas">Pemeriksaan Sistem Rem &amp; Ganti Kampas</option>
+                        <option value="Rotasi & Penggantian Ban Luar/Dalam">Rotasi &amp; Penggantian Ban Luar/Dalam</option>
+                        <option value="Tune Up & Kalibrasi Injektor Common Rail">Tune Up &amp; Kalibrasi Injektor</option>
+                        <option value="Ganti Filter Solar & Filter Udara">Ganti Filter Solar &amp; Filter Udara</option>
+                        <option value="Ganti Oli Gardan & Transmisi">Ganti Oli Gardan &amp; Transmisi</option>
+                        <option value="Overhaul Mesin (Turun Mesin Total)">Overhaul Mesin (Turun Mesin)</option>
+                      </>
+                    )}
                   </select>
                 </div>
 
@@ -631,15 +897,52 @@ export const MaintenanceManager: React.FC<MaintenanceManagerProps> = ({
 
               {/* Spareparts Item Builder */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-slate-700 font-semibold">Rincian Sparepart yang Diganti</label>
-                  <button
-                    type="button"
-                    onClick={addSparepartRow}
-                    className="text-blue-600 font-medium hover:underline text-xs"
-                  >
-                    + Tambah Sparepart
-                  </button>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <label className="text-slate-700 font-semibold">Rincian Sparepart yang Diganti (Baru / Bekas)</label>
+                  <div className="flex items-center gap-2">
+                    {safeInventory.length > 0 && (
+                      <select
+                        defaultValue=""
+                        onChange={(e) => {
+                          const invId = e.target.value;
+                          if (!invId) return;
+                          const found = safeInventory.find(i => i.id === invId);
+                          if (found) {
+                            const condTag = found.condition === 'baru' ? 'BARU' : found.condition === 'bekas_rekondisi' ? 'REKONDISI' : 'BEKAS COPOTAN';
+                            setSpareparts(prev => [
+                              ...prev,
+                              {
+                                id: 'SP-' + Date.now(),
+                                name: `[${condTag}] ${found.partName} (${found.partCode})`,
+                                qty: 1,
+                                unit: found.unit,
+                                unitPrice: found.unitPrice,
+                                totalPrice: found.unitPrice
+                              }
+                            ]);
+                          }
+                          e.target.value = '';
+                        }}
+                        className="bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-lg px-2.5 py-1 text-[11px] font-bold focus:outline-hidden"
+                      >
+                        <option value="">+ Pilih dari Gudang Sparepart (Baru/Bekas)...</option>
+                        {safeInventory
+                          .filter(i => i.stockQty > 0 && i.condition !== 'bekas_rusak_afkir')
+                          .map(i => (
+                            <option key={i.id} value={i.id}>
+                              [{i.condition === 'baru' ? 'BARU' : 'BEKAS'}] {i.partCode} - {i.partName} (Stok: {i.stockQty} {i.unit})
+                            </option>
+                          ))}
+                      </select>
+                    )}
+                    <button
+                      type="button"
+                      onClick={addSparepartRow}
+                      className="text-blue-600 font-bold hover:underline text-xs"
+                    >
+                      + Baris Manual
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -699,6 +1002,12 @@ export const MaintenanceManager: React.FC<MaintenanceManagerProps> = ({
                   </div>
                 </div>
               </div>
+
+              <ReceiptUploadField
+                label="Upload Nota / Faktur Bengkel & Sparepart"
+                value={receiptProofUrl}
+                onChange={setReceiptProofUrl}
+              />
 
               <div className="pt-4 border-t border-slate-100 flex justify-end gap-2">
                 <button
@@ -770,13 +1079,23 @@ export const MaintenanceManager: React.FC<MaintenanceManagerProps> = ({
                     onChange={(e) => setEditFormData({ ...editFormData, serviceType: e.target.value as ServiceType })}
                     className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-hidden focus:border-blue-500 font-medium"
                   >
-                    <option value="Ganti Oli Mesin & Filter Oli">Ganti Oli Mesin &amp; Filter Oli</option>
-                    <option value="Servis Rem & Kampas Rem">Servis Rem &amp; Kampas Rem</option>
-                    <option value="Ganti Ban Luar / Rotasi Ban">Ganti Ban Luar / Rotasi Ban</option>
-                    <option value="Tune-up Mesin & Kalibrasi Injektor">Tune-up Mesin &amp; Kalibrasi Injektor</option>
-                    <option value="Perbaikan Sistem Kaki-kaki & Suspensi">Perbaikan Kaki-kaki &amp; Suspensi</option>
-                    <option value="Overhaul Mesin (Turun Mesin)">Overhaul Mesin (Turun Mesin)</option>
-                    <option value="Perbaikan Body & Las">Perbaikan Body &amp; Las</option>
+                    {serviceTypes.length > 0 ? (
+                      serviceTypes.map(st => (
+                        <option key={st.id} value={st.name}>
+                          {st.name} ({st.defaultIntervalKm.toLocaleString()} KM)
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="Ganti Oli Mesin & Filter Oli">Ganti Oli Mesin &amp; Filter Oli</option>
+                        <option value="Pemeriksaan Sistem Rem & Ganti Kampas">Pemeriksaan Sistem Rem &amp; Ganti Kampas</option>
+                        <option value="Rotasi & Penggantian Ban Luar/Dalam">Rotasi &amp; Penggantian Ban Luar/Dalam</option>
+                        <option value="Tune Up & Kalibrasi Injektor Common Rail">Tune Up &amp; Kalibrasi Injektor</option>
+                        <option value="Ganti Filter Solar & Filter Udara">Ganti Filter Solar &amp; Filter Udara</option>
+                        <option value="Ganti Oli Gardan & Transmisi">Ganti Oli Gardan &amp; Transmisi</option>
+                        <option value="Overhaul Mesin (Turun Mesin Total)">Overhaul Mesin (Turun Mesin)</option>
+                      </>
+                    )}
                   </select>
                 </div>
 
@@ -883,6 +1202,12 @@ export const MaintenanceManager: React.FC<MaintenanceManagerProps> = ({
                 </div>
               </div>
 
+              <ReceiptUploadField
+                label="Upload / Ganti Nota Bengkel & Sparepart"
+                value={editFormData.receiptProofUrl}
+                onChange={(url) => setEditFormData({ ...editFormData, receiptProofUrl: url })}
+              />
+
               <div className="pt-4 border-t border-slate-100 flex justify-end gap-2">
                 <button
                   type="button"
@@ -899,6 +1224,62 @@ export const MaintenanceManager: React.FC<MaintenanceManagerProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Preview Nota Bengkel */}
+      {inspectedReceiptRecord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50">
+              <div className="flex items-center gap-2">
+                <Receipt className="w-4 h-4 text-blue-600" />
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900">
+                    Nota Bengkel: {inspectedReceiptRecord.workOrderNumber} ({inspectedReceiptRecord.nopol})
+                  </h4>
+                  <p className="text-[10px] text-slate-400">
+                    {formatDateIndo(inspectedReceiptRecord.serviceDate)} • {inspectedReceiptRecord.workshopName} • {formatRupiah(inspectedReceiptRecord.totalCost)}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setInspectedReceiptRecord(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4 bg-slate-100 flex items-center justify-center min-h-[300px] max-h-[480px] overflow-auto">
+              {inspectedReceiptRecord.receiptProofUrl?.startsWith('data:application/pdf') ? (
+                <iframe
+                  src={inspectedReceiptRecord.receiptProofUrl}
+                  title="Nota Bengkel PDF"
+                  className="w-full h-[420px] rounded-lg border border-slate-200 bg-white"
+                />
+              ) : inspectedReceiptRecord.receiptProofUrl ? (
+                <img
+                  src={inspectedReceiptRecord.receiptProofUrl}
+                  alt="Nota Bengkel"
+                  className="max-w-full max-h-[440px] object-contain rounded-lg shadow-sm"
+                />
+              ) : (
+                <div className="text-center text-slate-400 text-xs">
+                  <FileText className="w-8 h-8 mx-auto mb-2" />
+                  Belum ada nota terlampir.
+                </div>
+              )}
+            </div>
+            <div className="px-5 py-3 bg-white border-t border-slate-100 flex items-center justify-between text-xs">
+              <span className="text-slate-500">{inspectedReceiptRecord.serviceType}</span>
+              <button
+                onClick={() => setInspectedReceiptRecord(null)}
+                className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg"
+              >
+                Tutup
+              </button>
+            </div>
           </div>
         </div>
       )}

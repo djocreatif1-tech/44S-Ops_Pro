@@ -29,6 +29,8 @@ interface HeaderProps {
   isSyncing: boolean;
   onToggleSidebar?: () => void;
   onOpenNotifConfig?: () => void;
+  onToggleNotifPanel?: () => void;
+  isNotifPanelOpen?: boolean;
   onOpenRoleMatrix?: () => void;
   activeNotifCount?: number;
   userRole?: UserRole;
@@ -47,6 +49,8 @@ export const Header: React.FC<HeaderProps> = ({
   isSyncing,
   onToggleSidebar,
   onOpenNotifConfig,
+  onToggleNotifPanel,
+  isNotifPanelOpen = false,
   onOpenRoleMatrix,
   activeNotifCount = 0,
   userRole = 'owner',
@@ -82,33 +86,33 @@ export const Header: React.FC<HeaderProps> = ({
   ];
 
   return (
-    <header className="h-16 bg-white border-b border-slate-200 sticky top-0 z-30 px-3 sm:px-6 lg:px-8 flex items-center justify-between">
+    <header className="h-16 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-2xs sticky top-0 z-30 px-3 sm:px-6 lg:px-8 flex items-center justify-between transition-colors">
       {/* Left side brand */}
       <div className="flex items-center gap-2 sm:gap-3">
         {onToggleSidebar && (
           <button
             onClick={onToggleSidebar}
-            className="lg:hidden p-2 rounded-xl bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 transition touch-manipulation"
+            className="lg:hidden p-2 rounded-xl bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 transition touch-manipulation cursor-pointer"
             aria-label="Toggle Menu Navigasi"
           >
             <Menu className="w-5 h-5" />
           </button>
         )}
 
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold shadow-xs">
-            <Truck className="w-4 h-4 sm:w-5 sm:h-5" />
+        <div className="flex items-center gap-2.5 sm:gap-3.5">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-500 flex items-center justify-center text-white font-bold shadow-xs shadow-blue-500/20 ring-1 ring-blue-500/20">
+            <Truck className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
           </div>
           <div>
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <span className="font-bold text-sm sm:text-base lg:text-lg text-slate-800 tracking-tight">
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-sm sm:text-base lg:text-lg text-slate-900 tracking-tight">
                 44S Ops<span className="text-blue-600">_pro</span>
               </span>
-              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700 px-1.5 sm:px-2 py-0.5 rounded border border-blue-200/60 hidden xs:inline-block">
+              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full border border-slate-200/70 hidden xs:inline-block">
                 Enterprise
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 font-medium hidden md:block">
+            <p className="text-[11px] text-slate-500 font-normal hidden md:block leading-tight">
               Sistem Manajemen Terpadu Operasional Kendaraan &amp; Rekening Kas
             </p>
           </div>
@@ -117,79 +121,77 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right side actions */}
       <div className="flex items-center gap-1.5 sm:gap-2.5">
-        {/* Owner-only controls: Notification, Sheets Status, Sync, and Deploy Hub */}
-        {effectiveRole === 'owner' && (
-          <>
-            {/* Notification Config / Bell Button */}
-            {onOpenNotifConfig && (
-              <button
-                onClick={onOpenNotifConfig}
-                className="relative p-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 hover:text-blue-600 hover:bg-slate-100 transition shadow-2xs touch-manipulation cursor-pointer"
-                title="Pengaturan Notifikasi Operasional"
-              >
-                <Bell className="w-4 h-4" />
-                {activeNotifCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full text-[9px] flex items-center justify-center font-bold">
-                    {activeNotifCount}
-                  </span>
-                )}
-              </button>
-            )}
-
-            {/* Apps Script Connection Status Badge */}
-            <button
-              onClick={onOpenDeployModal}
-              className={`hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition border touch-manipulation cursor-pointer ${
-                isConnected
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100/70'
-                  : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100/70'
-              }`}
-              title="Setup / Buka Google Apps Script (Kode.gs & Index.html)"
-            >
-              {isConnected ? (
-                <>
-                  <CloudCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span className="hidden md:inline font-medium">Sheets</span>
-                </>
-              ) : (
-                <>
-                  <FileCode className="w-4 h-4 text-blue-600 shrink-0" />
-                  <span className="hidden md:inline font-medium">Apps Script</span>
-                </>
-              )}
-            </button>
-
-            {/* Sync Trigger Button */}
+        {/* Real-time Sync Status & Manual Refresh (Active on both HP & PC) */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {isConnected ? (
             <button
               onClick={onTriggerSync}
               disabled={isSyncing}
-              className="hidden md:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-medium hover:bg-slate-50 active:scale-95 transition shadow-xs touch-manipulation cursor-pointer"
-              title="Sinkronkan dengan Google Spreadsheet"
+              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80 hover:bg-emerald-100 transition shadow-2xs touch-manipulation cursor-pointer text-xs font-semibold"
+              title="Real-time sinkronisasi aktif antara HP dan PC. Klik untuk sinkronkan sekarang."
             >
-              <RotateCw className={`w-3.5 h-3.5 text-slate-500 ${isSyncing ? 'animate-spin text-blue-600' : ''}`} />
-              <span>{isSyncing ? 'Sync...' : 'Sync'}</span>
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
+              </span>
+              <span className="hidden sm:inline text-[11px]">Real-time Sync</span>
+              <RotateCw className={`w-3.5 h-3.5 text-emerald-700 ${isSyncing ? 'animate-spin' : ''}`} />
             </button>
+          ) : (
+            effectiveRole === 'owner' && userRole === 'owner' && (
+              <button
+                onClick={onOpenDeployModal}
+                className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition shadow-2xs touch-manipulation cursor-pointer text-xs font-semibold"
+                title="Hubungkan Google Spreadsheet untuk Real-Time Sync HP & PC"
+              >
+                <FileCode className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                <span className="text-[11px]">Hubungkan Cloud</span>
+              </button>
+            )
+          )}
 
-            {/* Deploy Hub Modal Button */}
+          {/* Notification Alarm Toggle Button */}
+          {(onToggleNotifPanel || onOpenNotifConfig) && (
+            <button
+              onClick={onToggleNotifPanel || onOpenNotifConfig}
+              className={`relative p-2 rounded-xl border transition shadow-2xs touch-manipulation cursor-pointer ${
+                isNotifPanelOpen
+                  ? 'bg-blue-600 border-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-slate-50 border-slate-200/80 text-slate-600 hover:text-blue-600 hover:bg-slate-100'
+              }`}
+              title={isNotifPanelOpen ? 'Sembunyikan Pusat Notifikasi' : 'Tampilkan Pusat Notifikasi & Pengingat Operasional'}
+              aria-expanded={isNotifPanelOpen}
+            >
+              <Bell className="w-4 h-4" />
+              {activeNotifCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full text-[9px] flex items-center justify-center font-bold ring-2 ring-white">
+                  {activeNotifCount}
+                </span>
+              )}
+            </button>
+          )}
+
+          {/* Owner-only controls: Deploy Hub (Strictly visible to Owner role only, responsive on Mobile & PC) */}
+          {effectiveRole === 'owner' && userRole === 'owner' && (
             <button
               onClick={onOpenDeployModal}
-              className="hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-blue-600 text-white font-medium text-xs hover:bg-blue-700 active:scale-95 transition shadow-xs touch-manipulation cursor-pointer"
-              title="Buka Deployment Hub"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full bg-slate-900 text-white font-semibold text-[11px] sm:text-xs hover:bg-slate-800 active:scale-95 transition shadow-xs touch-manipulation cursor-pointer"
+              title="Buka Deployment Hub Google Apps Script (Khusus Owner)"
             >
-              <PlusCircle className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden sm:inline">Deploy Hub</span>
+              <PlusCircle className="w-3.5 h-3.5 shrink-0 text-blue-400" />
+              <span>Apps Script</span>
             </button>
-          </>
-        )}
+          )}
+        </div>
 
         {/* User Account & Session Profile Dropdown */}
         <div className="relative ml-1">
           <button
             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-            className="flex items-center gap-2 p-1 sm:px-2.5 sm:py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 transition shadow-2xs group cursor-pointer"
+            className="flex items-center gap-2 p-1 sm:pl-1.5 sm:pr-2.5 sm:py-1.5 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200/80 hover:border-slate-300 transition shadow-2xs group cursor-pointer"
             title={`Akun: ${effectiveName} (${roleMeta.shortLabel})`}
           >
-            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center font-bold text-white text-xs shadow-xs ${
+            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center font-bold text-white text-xs shadow-2xs ${
               effectiveRole === 'owner' ? 'bg-gradient-to-tr from-amber-500 to-amber-600' :
               effectiveRole === 'admin1' ? 'bg-gradient-to-tr from-emerald-500 to-teal-600' :
               'bg-gradient-to-tr from-blue-500 to-indigo-600'

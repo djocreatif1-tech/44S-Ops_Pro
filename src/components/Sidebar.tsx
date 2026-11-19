@@ -12,8 +12,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Coins,
+  CreditCard,
+  Landmark,
   Crown,
-  Shield,
   Briefcase,
   UserCheck,
   ChevronDown,
@@ -21,9 +22,16 @@ import {
   Lock,
   ShieldCheck,
   History,
-  LogOut,
-  User,
-  KeyRound
+  Layers,
+  Award,
+  Search,
+  SlidersHorizontal,
+  Maximize2,
+  Minimize2,
+  FileText,
+  Building,
+  Receipt,
+  Package
 } from 'lucide-react';
 import { UserRole, AuthSession } from '../types';
 import { getRoleMeta, isTabPermitted } from '../utils/permissions';
@@ -60,33 +68,74 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenProfile
 }) => {
   const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
+  const [menuSearch, setMenuSearch] = useState('');
+  const [isCompactDensity, setIsCompactDensity] = useState(false);
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    main: true,
+    ops: true,
+    master: true,
+    admin: true
+  });
+
+  const toggleSection = (secKey: string) => {
+    setOpenSections(prev => ({
+      ...prev,
+      [secKey]: !prev[secKey]
+    }));
+  };
 
   const navSections = [
     {
+      key: 'main',
       title: 'Main Menu',
+      badge: '6 Modul',
       items: [
         { id: 'dashboard', label: 'Ringkasan Dasbor', icon: LayoutDashboard },
         { id: 'vehicles', label: 'Kelola Kendaraan', icon: Truck },
         { id: 'tax', label: 'Pajak & Legalitas', icon: FileCheck2 },
         { id: 'fuel', label: 'Konsumsi Solar', icon: Fuel },
         { id: 'timesheet', label: 'Laporan Time Sheet', icon: Clock },
+        { id: 'tripsheet', label: 'Trip Sheet & Surat Jalan', icon: FileText, highlight: true },
       ]
     },
     {
+      key: 'ops',
       title: 'Operasional & Keuangan',
+      badge: '7 Modul',
       items: [
-        { id: 'finance', label: 'Arus Kas Operasional', icon: Wallet },
-        { id: 'maintenance', label: 'Perawatan Rutin', icon: Wrench },
-        { id: 'drivers', label: 'Data Pengemudi', icon: Users },
+        { id: 'finance', label: 'Buku Kas Operasional', icon: Wallet },
+        { id: 'finance_pocket', label: 'Arus Kas Saku Driver', icon: Coins },
+        { id: 'finance_equipment', label: 'Arus Kas Peralatan', icon: Wrench },
+        { id: 'maintenance', label: 'Perawatan Rutin Bengkel', icon: Wrench },
+        { id: 'sparepart_inventory', label: 'Inventory Sparepart (Baru & Bekas)', icon: Package, highlight: true },
+        { id: 'drivers', label: 'Data Pengemudi & Supir', icon: Users },
         { id: 'reports', label: 'Laporan & Analitik', icon: FileBarChart },
       ]
     },
     {
-      title: 'Master Data & Pengguna',
+      key: 'master',
+      title: 'Master Referensi Sistem',
+      badge: 'Master & Referensi',
       items: [
-        { id: 'master_non_rental', label: 'Master Pemasukan Non-Sewa', icon: Coins, highlight: true },
-        { id: 'users', label: 'Manajemen Akun', icon: ShieldCheck },
-        { id: 'activity_log', label: 'Log Aktivitas', icon: History },
+        { id: 'master_hub', label: 'Pusat Master & Referensi', icon: Layers, highlight: true },
+        { id: 'master_deposit_companies', label: 'Perusahaan Pemberi Deposit', icon: Building },
+        { id: 'master_suppliers', label: 'Supplier Peralatan & Part', icon: Wrench },
+        { id: 'master_expense_categories', label: 'Jenis Pos Pengeluaran', icon: Receipt },
+        { id: 'master_admin_staff', label: 'Karyawan Administrasi', icon: Briefcase },
+        { id: 'master_payment_methods', label: 'Metode Pembayaran', icon: CreditCard },
+        { id: 'master_company_accounts', label: 'Rekening Perusahaan', icon: Landmark },
+        { id: 'master_service_types', label: 'Jenis Servis Bengkel', icon: Wrench },
+        { id: 'master_sim_classes', label: 'Golongan SIM Pengemudi', icon: Award },
+        { id: 'master_non_rental', label: 'Kategori Non-Sewa', icon: Coins },
+      ]
+    },
+    {
+      key: 'admin',
+      title: 'Keamanan & Akun',
+      badge: 'RBAC',
+      items: [
+        { id: 'users', label: 'Manajemen Akun Pengguna', icon: ShieldCheck },
+        { id: 'activity_log', label: 'Log Audit Aktivitas', icon: History },
       ]
     }
   ];
@@ -120,18 +169,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
+  // Filter sections and items based on search query
+  const q = menuSearch.trim().toLowerCase();
+  const filteredNavSections = navSections.map(sec => {
+    const matchingItems = sec.items.filter(item => {
+      if (!q) return true;
+      return (
+        item.label.toLowerCase().includes(q) ||
+        item.id.toLowerCase().includes(q) ||
+        sec.title.toLowerCase().includes(q)
+      );
+    });
+    return {
+      ...sec,
+      items: matchingItems
+    };
+  }).filter(sec => sec.items.length > 0);
+
   const sidebarContent = (
     <div className="flex flex-col h-full bg-white select-none">
-      {/* Top Section / Title Info */}
-      <div className={`p-4 border-b border-slate-100 flex items-center justify-between ${isCollapsed ? 'lg:justify-center' : ''}`}>
+      {/* Top Header */}
+      <div className={`p-3.5 border-b border-slate-100 flex items-center justify-between ${isCollapsed ? 'lg:justify-center' : ''}`}>
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+          <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-xs shrink-0">
             <Truck className="w-4 h-4" />
           </div>
           {!isCollapsed && (
-            <div>
-              <div className="text-xs font-bold text-slate-800 leading-none">Fleet Operations</div>
-              <div className="text-[10px] text-slate-400 font-medium mt-0.5">Control Center</div>
+            <div className="truncate">
+              <div className="text-xs font-bold text-slate-800 leading-none">44S Ops<span className="text-blue-600">_pro</span></div>
+              <div className="text-[10px] text-slate-400 font-medium mt-0.5">Control Center Enterprise</div>
             </div>
           )}
         </div>
@@ -149,7 +215,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Role Display / Switcher in Sidebar */}
       {!isCollapsed && (
-        <div className="p-3 border-b border-slate-100 bg-slate-50/50">
+        <div className="p-2.5 border-b border-slate-100 bg-slate-50/50">
           <div className="relative">
             {userRole === 'owner' ? (
               <button
@@ -235,98 +301,147 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     );
                   })}
                 </div>
-
-                {onOpenRoleMatrix && (
-                  <div className="pt-1.5 border-t border-slate-100">
-                    <button
-                      onClick={() => {
-                        setIsRoleDropdownOpen(false);
-                        onOpenRoleMatrix();
-                      }}
-                      className="w-full py-1 text-[10px] text-slate-600 hover:text-blue-600 font-semibold text-center flex items-center justify-center gap-1 cursor-pointer"
-                    >
-                      <ShieldCheck className="w-3 h-3 text-blue-600" />
-                      <span>Pelajari Batasan Setiap Role</span>
-                    </button>
-                  </div>
-                )}
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Navigation Sections */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-4">
-        {navSections.map((sec, idx) => (
-          <div key={idx} className="space-y-1">
-            {!isCollapsed && (
-              <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                {sec.title}
-              </div>
+      {/* Dynamic Search & Compact Density Controls (Save Screen Real Estate) */}
+      {!isCollapsed && (
+        <div className="px-2.5 pt-2 pb-1.5 border-b border-slate-100 flex items-center gap-1.5">
+          <div className="relative flex-1">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Cari menu / modul..."
+              value={menuSearch}
+              onChange={(e) => setMenuSearch(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-7 pr-6 py-1 text-[11px] text-slate-700 placeholder-slate-400 focus:outline-hidden focus:border-blue-500 focus:bg-white"
+            />
+            {menuSearch && (
+              <button
+                onClick={() => setMenuSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-3 h-3" />
+              </button>
             )}
-            {sec.items.map((item) => {
-              const Icon = item.icon;
-              const isActive = currentTab === item.id;
-              const isAllowed = isTabPermitted(userRole, item.id);
-
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => handleItemClick(item.id, isAllowed)}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition group relative touch-manipulation cursor-pointer ${
-                    isActive
-                      ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                      : isAllowed
-                      ? item.highlight
-                        ? 'bg-amber-50/70 text-amber-900 hover:bg-amber-100/70 border border-amber-200/50'
-                        : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
-                      : 'text-slate-400 bg-slate-50/50 hover:bg-slate-100/50 opacity-60'
-                  } ${isCollapsed ? 'justify-center px-2' : ''}`}
-                  title={
-                    !isAllowed
-                      ? `Terkunci: Role ${roleMeta.shortLabel} tidak memiliki izin ke menu ${item.label}`
-                      : item.label
-                  }
-                >
-                  <Icon
-                    className={`w-4 h-4 shrink-0 transition ${
-                      isActive
-                        ? 'text-white'
-                        : isAllowed
-                        ? item.highlight
-                          ? 'text-amber-600'
-                          : 'text-slate-500 group-hover:text-slate-800'
-                        : 'text-slate-400'
-                    }`}
-                  />
-                  {!isCollapsed && (
-                    <div className="flex items-center justify-between flex-1 truncate">
-                      <span className="truncate">{item.label}</span>
-                      {!isAllowed && (
-                        <Lock className="w-3 h-3 text-slate-400 shrink-0 ml-1" />
-                      )}
-                    </div>
-                  )}
-
-                  {/* Active Indicator bar */}
-                  {isActive && !isCollapsed && (
-                    <span className="w-1 h-3.5 bg-white/70 rounded-full"></span>
-                  )}
-                </button>
-              );
-            })}
           </div>
-        ))}
+          <button
+            onClick={() => setIsCompactDensity(!isCompactDensity)}
+            className={`p-1.5 rounded-lg border transition cursor-pointer ${
+              isCompactDensity
+                ? 'bg-blue-50 text-blue-600 border-blue-200'
+                : 'bg-white text-slate-400 border-slate-200 hover:text-slate-700'
+            }`}
+            title={isCompactDensity ? 'Mode Normal' : 'Mode Ringkas (Hemat Ruang)'}
+          >
+            {isCompactDensity ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+      )}
+
+      {/* Navigation Sections */}
+      <div className={`flex-1 overflow-y-auto ${isCompactDensity ? 'p-1.5 space-y-1.5' : 'p-2.5 space-y-3'}`}>
+        {filteredNavSections.map((sec) => {
+          const isOpen = openSections[sec.key] !== false;
+
+          return (
+            <div key={sec.key} className="space-y-0.5">
+              {!isCollapsed && (
+                <button
+                  type="button"
+                  onClick={() => toggleSection(sec.key)}
+                  className="w-full px-2 py-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400 hover:text-slate-700 transition cursor-pointer group"
+                >
+                  <span className="truncate">{sec.title}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[9px] font-mono px-1 py-0.2 bg-slate-100 rounded text-slate-500 group-hover:bg-slate-200">
+                      {sec.badge}
+                    </span>
+                    <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform duration-200 ${isOpen ? '' : '-rotate-90'}`} />
+                  </div>
+                </button>
+              )}
+
+              {(isOpen || isCollapsed || q) && (
+                <div className="space-y-0.5">
+                  {sec.items.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = currentTab === item.id;
+                    const isAllowed = isTabPermitted(userRole, item.id, authSession?.allowedTabs);
+
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => handleItemClick(item.id, isAllowed)}
+                        className={`w-full flex items-center gap-2.5 rounded-xl text-xs font-medium transition group relative touch-manipulation cursor-pointer ${
+                          isCompactDensity ? 'px-2.5 py-1.5 text-[11px]' : 'px-3 py-2 text-xs'
+                        } ${
+                          isActive
+                            ? 'bg-blue-600 text-white shadow-2xs font-semibold'
+                            : isAllowed
+                            ? item.highlight
+                              ? 'bg-amber-50/80 text-amber-900 hover:bg-amber-100/80 border border-amber-200/60 font-semibold'
+                              : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
+                            : 'text-slate-400 bg-slate-50/50 hover:bg-slate-100/50 opacity-60'
+                        } ${isCollapsed ? 'justify-center px-2 py-2' : ''}`}
+                        title={
+                          !isAllowed
+                            ? `Terkunci: Role ${roleMeta.shortLabel} tidak memiliki izin ke menu ${item.label}`
+                            : item.label
+                        }
+                      >
+                        <Icon
+                          className={`shrink-0 transition ${
+                            isCompactDensity ? 'w-3.5 h-3.5' : 'w-4 h-4'
+                          } ${
+                            isActive
+                              ? 'text-white'
+                              : isAllowed
+                              ? item.highlight
+                                ? 'text-amber-600'
+                                : 'text-slate-500 group-hover:text-slate-800'
+                              : 'text-slate-400'
+                          }`}
+                        />
+                        {!isCollapsed && (
+                          <div className="flex items-center justify-between flex-1 truncate">
+                            <span className="truncate">{item.label}</span>
+                            {!isAllowed && (
+                              <Lock className="w-3 h-3 text-slate-400 shrink-0 ml-1" />
+                            )}
+                          </div>
+                        )}
+
+                        {/* Active Indicator dot */}
+                        {isActive && !isCollapsed && (
+                          <span className="w-1.5 h-1.5 bg-white rounded-full shrink-0 shadow-xs"></span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {filteredNavSections.length === 0 && (
+          <div className="py-6 text-center text-xs text-slate-400">
+            Tidak ada menu yang sesuai &ldquo;{menuSearch}&rdquo;
+          </div>
+        )}
       </div>
 
       {/* Bottom User Card & RBAC Guide Link */}
-      <div className="p-3 border-t border-slate-100 space-y-2 bg-slate-50/30">
+      <div className="p-2.5 border-t border-slate-100 space-y-1.5 bg-slate-50/30">
         {!isCollapsed && authSession && (
-          <div className="p-2.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs space-y-2">
+          <div className="p-2 rounded-xl bg-white border border-slate-200/80 shadow-2xs space-y-1.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 overflow-hidden">
-                <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-white text-xs ${
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-white text-xs shrink-0 ${
                   userRole === 'owner' ? 'bg-amber-600' :
                   userRole === 'admin1' ? 'bg-emerald-600' :
                   'bg-blue-600'
@@ -347,7 +462,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   onClick={onLockScreen}
                   title="Kunci Layar"
-                  className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition"
+                  className="p-1 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition"
                 >
                   <Lock className="w-3.5 h-3.5" />
                 </button>
@@ -358,7 +473,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {onOpenProfile && (
                 <button
                   onClick={onOpenProfile}
-                  className="flex-1 py-1 px-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg font-semibold text-center transition"
+                  className="flex-1 py-0.5 px-1 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg font-semibold text-center transition"
                 >
                   Profil
                 </button>
@@ -366,7 +481,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {onLogout && (
                 <button
                   onClick={onLogout}
-                  className="flex-1 py-1 px-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg font-semibold text-center transition"
+                  className="flex-1 py-0.5 px-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg font-semibold text-center transition"
                 >
                   Keluar
                 </button>
@@ -375,25 +490,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {!isCollapsed && onOpenRoleMatrix && userRole === 'owner' && (
-          <button
-            onClick={onOpenRoleMatrix}
-            className="w-full p-2.5 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-200/80 hover:border-blue-200 text-slate-700 hover:text-blue-700 transition flex items-center justify-between text-xs font-semibold group cursor-pointer"
-          >
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-blue-600" />
-              <span>Matriks Hak Akses</span>
-            </div>
-            <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded">
-              RBAC
-            </span>
-          </button>
-        )}
-
         {onToggleCollapse && (
           <button
             onClick={onToggleCollapse}
-            className="hidden lg:flex w-full items-center justify-center gap-2 py-2 text-xs font-semibold text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+            className="hidden lg:flex w-full items-center justify-center gap-1.5 py-1.5 text-xs font-semibold text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition cursor-pointer"
           >
             {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
             {!isCollapsed && <span>Ciutkan Menu</span>}

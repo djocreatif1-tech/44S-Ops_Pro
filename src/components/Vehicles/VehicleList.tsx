@@ -9,7 +9,12 @@ import {
   Gauge,
   User,
   X,
-  Lock
+  Lock,
+  LayoutGrid,
+  Table,
+  Calendar,
+  Fuel,
+  Building2
 } from 'lucide-react';
 import { Vehicle, VehicleType, FuelType, VehicleStatus, UserRole } from '../../types';
 import {
@@ -18,9 +23,13 @@ import {
   getVehicleStatusBadge
 } from '../../utils/formatters';
 import { exportVehiclesToExcel, exportVehiclesToPDF } from '../../utils/exportUtils';
+import { confirmDelete } from '../../utils/dialogService';
 import { ModuleFilterExportBar } from '../Common/ModuleFilterExportBar';
 import { getRolePermissions } from '../../utils/permissions';
 import { RoleRestrictedBanner } from '../Common/RoleRestrictedBanner';
+import { TablePagination } from '../Common/TablePagination';
+import { ModuleAnalyticsPanel } from '../Common/ModuleAnalyticsPanel';
+import { BarChart3 } from 'lucide-react';
 
 interface VehicleListProps {
   vehicles: Vehicle[];
@@ -43,11 +52,23 @@ export const VehicleList: React.FC<VehicleListProps> = ({
 }) => {
   const safeVehicles = Array.isArray(vehicles) ? vehicles : [];
   const perms = getRolePermissions(userRole);
+  const [viewMode, setViewMode] = useState<'table' | 'grid' | 'analytics'>('table');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
+  const [filterCompany, setFilterCompany] = useState<string>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  
+  // Unique list of vehicle owner companies
+  const uniqueCompanies = Array.from(
+    new Set(safeVehicles.map(v => v.ownerCompany || 'PT Transindo Logistik').filter(Boolean))
+  ) as string[];
+  
+  // Pagination State (Next Halaman)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(6);
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
 
@@ -59,6 +80,7 @@ export const VehicleList: React.FC<VehicleListProps> = ({
     type: 'Dump Truck',
     year: 2023,
     fuelType: 'Bio Solar',
+    ownerCompany: 'PT Transindo Logistik',
     chassisNumber: '',
     engineNumber: '',
     currentOdometer: 0,
@@ -76,13 +98,16 @@ export const VehicleList: React.FC<VehicleListProps> = ({
 
   const filteredVehicles = safeVehicles.filter((v) => {
     const q = (searchQuery || '').toLowerCase();
+    const vCompany = v.ownerCompany || 'PT Transindo Logistik';
     const matchesSearch =
       (v.nopol || '').toLowerCase().includes(q) ||
       (v.brand || '').toLowerCase().includes(q) ||
       (v.model || '').toLowerCase().includes(q) ||
-      (v.assignedDriver || '').toLowerCase().includes(q);
+      (v.assignedDriver || '').toLowerCase().includes(q) ||
+      vCompany.toLowerCase().includes(q);
     const matchesStatus = filterStatus === 'all' || v.status === filterStatus;
     const matchesType = filterType === 'all' || v.type === filterType;
+    const matchesCompany = filterCompany === 'all' || vCompany === filterCompany;
 
     // Date range filter against stnk or kir due dates if set
     if (startDate && ((v.stnk1YearDate && v.stnk1YearDate < startDate) && (v.kirDate && v.kirDate < startDate))) {
@@ -92,8 +117,12 @@ export const VehicleList: React.FC<VehicleListProps> = ({
       return false;
     }
 
-    return matchesSearch && matchesStatus && matchesType;
+    return matchesSearch && matchesStatus && matchesType && matchesCompany;
   });
+
+  // Paginated Vehicles for Next / Prev Pages
+  const totalFilteredVehicles = filteredVehicles.length;
+  const paginatedVehicles = filteredVehicles.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const dateRangeText = startDate && endDate
     ? `${startDate} s/d ${endDate}`
@@ -120,6 +149,7 @@ export const VehicleList: React.FC<VehicleListProps> = ({
       type: 'Truk Box',
       year: 2023,
       fuelType: 'Solar Dexlite',
+      ownerCompany: 'PT Transindo Logistik',
       chassisNumber: '',
       engineNumber: '',
       currentOdometer: 1000,
@@ -139,7 +169,10 @@ export const VehicleList: React.FC<VehicleListProps> = ({
 
   const handleOpenEdit = (vehicle: Vehicle) => {
     setEditingVehicle(vehicle);
-    setFormData({ ...vehicle });
+    setFormData({
+      ...vehicle,
+      ownerCompany: vehicle.ownerCompany || 'PT Transindo Logistik'
+    });
     setIsModalOpen(true);
   };
 
@@ -150,7 +183,8 @@ export const VehicleList: React.FC<VehicleListProps> = ({
     if (editingVehicle) {
       onUpdateVehicle({
         ...editingVehicle,
-        ...formData
+        ...formData,
+        ownerCompany: formData.ownerCompany || 'PT Transindo Logistik'
       } as Vehicle);
     } else {
       const newVehicle: Vehicle = {
@@ -161,6 +195,7 @@ export const VehicleList: React.FC<VehicleListProps> = ({
         type: formData.type || 'Truk Box',
         year: formData.year || 2023,
         fuelType: formData.fuelType || 'Bio Solar',
+        ownerCompany: formData.ownerCompany || 'PT Transindo Logistik',
         chassisNumber: formData.chassisNumber || '',
         engineNumber: formData.engineNumber || '',
         currentOdometer: Number(formData.currentOdometer) || 0,
@@ -181,9 +216,9 @@ export const VehicleList: React.FC<VehicleListProps> = ({
   };
 
   const handleDelete = (id: string, nopol: string) => {
-    if (confirm(`Yakin ingin menghapus unit kendaraan ${nopol}?`)) {
-      onDeleteVehicle(id);
-    }
+    confirmDelete(`Yakin ingin menghapus unit kendaraan ${nopol}?`).then((ok) => {
+      if (ok) onDeleteVehicle(id);
+    });
   };
 
   return (
@@ -210,26 +245,81 @@ export const VehicleList: React.FC<VehicleListProps> = ({
             Total {vehicles.length} unit armada terdaftar dalam database operasional
           </p>
         </div>
-        {perms.canAddVehicle ? (
-          <button
-            onClick={handleOpenAdd}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-lg shadow-xs active:scale-95 transition"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Tambah Kendaraan</span>
-          </button>
-        ) : (
-          <button
-            disabled
-            className="flex items-center gap-2 px-3.5 py-2 bg-slate-100 text-slate-400 font-medium text-xs rounded-lg cursor-not-allowed border border-slate-200"
-            title="Hanya Admin dan Owner yang dapat menambah unit baru"
-          >
-            <Lock className="w-3.5 h-3.5" />
-            <span>Tambah Unit (Terkunci)</span>
-          </button>
-        )}
+
+        <div className="flex items-center gap-2.5">
+          {/* View Mode Switcher: Tabel vs Kartu */}
+          <div className="flex items-center gap-1 bg-slate-200/70 p-1 rounded-xl border border-slate-200 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setViewMode('table')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                viewMode === 'table'
+                  ? 'bg-white text-blue-700 shadow-xs border border-slate-200/80'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="Tampilan Tabel & Kolom"
+            >
+              <Table className="w-3.5 h-3.5" />
+              <span>Tabel</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                viewMode === 'grid'
+                  ? 'bg-white text-blue-700 shadow-xs border border-slate-200/80'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="Tampilan Kartu Kotak"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>Kartu</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('analytics')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                viewMode === 'analytics'
+                  ? 'bg-indigo-600 text-white shadow-xs border border-indigo-700'
+                  : 'text-indigo-700 hover:bg-indigo-50'
+              }`}
+              title="Laporan & Analitik Khusus Modul Armada"
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>Laporan &amp; Analitik</span>
+            </button>
+          </div>
+
+          {perms.canAddVehicle ? (
+            <button
+              onClick={handleOpenAdd}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-lg shadow-xs active:scale-95 transition"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Tambah Kendaraan</span>
+            </button>
+          ) : (
+            <button
+              disabled
+              className="flex items-center gap-2 px-3.5 py-2 bg-slate-100 text-slate-400 font-medium text-xs rounded-lg cursor-not-allowed border border-slate-200"
+              title="Hanya Admin dan Owner yang dapat menambah unit baru"
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span>Tambah Unit (Terkunci)</span>
+            </button>
+          )}
+        </div>
       </div>
 
+      {viewMode === 'analytics' ? (
+        <ModuleAnalyticsPanel
+          moduleType="vehicles"
+          title="Laporan & Analitik Armada Kendaraan"
+          subtitle="Analisis kapasitas angkut (Ton), akumulasi jarak odometer, status kesiapan armada & distribusi kepemilikan aset"
+          vehicles={safeVehicles}
+        />
+      ) : (
+      <>
       {/* Date Filter & Export Bar */}
       <ModuleFilterExportBar
         startDate={startDate}
@@ -242,6 +332,16 @@ export const VehicleList: React.FC<VehicleListProps> = ({
         totalFilteredCount={filteredVehicles.length}
         totalAllCount={vehicles.length}
         moduleLabel="Unit Armada"
+        companies={Array.from(new Set(safeVehicles.map(v => v.ownerCompany || 'PT Transindo Logistik')))}
+        selectedCompany={filterCompany}
+        onCompanyChange={(val) => {
+          setFilterCompany(val);
+          setCurrentPage(1);
+        }}
+        companySummaries={Array.from(new Set(safeVehicles.map(v => v.ownerCompany || 'PT Transindo Logistik'))).map(comp => ({
+          companyName: comp,
+          count: safeVehicles.filter(v => (v.ownerCompany || 'PT Transindo Logistik') === comp).length
+        }))}
       >
         <div className="relative w-full md:w-72">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -249,14 +349,20 @@ export const VehicleList: React.FC<VehicleListProps> = ({
             type="text"
             placeholder="Cari Nopol, merk, supir..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
             className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-4 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-blue-500 focus:bg-white"
           />
         </div>
 
         <select
           value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
+          onChange={(e) => {
+            setFilterStatus(e.target.value);
+            setCurrentPage(1);
+          }}
           className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-hidden focus:border-blue-500 font-medium"
         >
           <option value="all">Semua Status</option>
@@ -268,7 +374,10 @@ export const VehicleList: React.FC<VehicleListProps> = ({
 
         <select
           value={filterType}
-          onChange={(e) => setFilterType(e.target.value)}
+          onChange={(e) => {
+            setFilterType(e.target.value);
+            setCurrentPage(1);
+          }}
           className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-hidden focus:border-blue-500 font-medium"
         >
           <option value="all">Semua Jenis Armada</option>
@@ -280,118 +389,381 @@ export const VehicleList: React.FC<VehicleListProps> = ({
           <option value="Minibus / HiAce">Minibus / HiAce</option>
           <option value="Mobil Operasional Kantor">Mobil Operasional</option>
         </select>
+
+        <select
+          value={filterCompany}
+          onChange={(e) => {
+            setFilterCompany(e.target.value);
+            setCurrentPage(1);
+          }}
+          className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-hidden focus:border-blue-500 font-medium"
+        >
+          <option value="all">Semua Perusahaan Aset</option>
+          {uniqueCompanies.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
       </ModuleFilterExportBar>
 
-      {/* Vehicles Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {filteredVehicles.map((vehicle) => {
-          const stnk1Badge = getTaxDueBadgeInfo(vehicle.stnk1YearDate);
-          const kirBadge = getTaxDueBadgeInfo(vehicle.kirDate);
+      {/* Main Vehicles Display: Table vs Grid */}
+      {viewMode === 'table' ? (
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-50/90 text-slate-600 border-b border-slate-200 font-semibold tracking-wider text-[11px] uppercase">
+                  <th className="py-3.5 px-4 text-center w-12">#</th>
+                  <th className="py-3.5 px-4 min-w-[155px]">No. Polisi &amp; Status</th>
+                  <th className="py-3.5 px-4 min-w-[170px]">Kendaraan &amp; Tipe</th>
+                  <th className="py-3.5 px-4 min-w-[170px]">Pemilik / Perusahaan Aset</th>
+                  <th className="py-3.5 px-4 min-w-[130px]">Odometer Terkini</th>
+                  <th className="py-3.5 px-4 min-w-[150px]">Pengemudi Utama</th>
+                  <th className="py-3.5 px-4 min-w-[140px]">Pajak STNK 1 Thn</th>
+                  <th className="py-3.5 px-4 min-w-[140px]">Uji KIR Dishub</th>
+                  <th className="py-3.5 px-4 min-w-[105px]">Plat 5 Thn</th>
+                  <th className="py-3.5 px-4 text-right min-w-[85px]">Kapasitas</th>
+                  <th className="py-3.5 px-4 text-center min-w-[150px]">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredVehicles.length === 0 ? (
+                  <tr>
+                    <td colSpan={11} className="py-12 text-center text-slate-400">
+                      <Truck className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                      <p className="font-semibold text-slate-600">Tidak ada unit armada yang cocok dengan filter</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Ubah kata kunci pencarian atau setel ulang filter</p>
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedVehicles.map((vehicle, index) => {
+                    const rowNumber = (currentPage - 1) * pageSize + index + 1;
+                    const stnk1Badge = getTaxDueBadgeInfo(vehicle.stnk1YearDate);
+                    const kirBadge = getTaxDueBadgeInfo(vehicle.kirDate);
 
-          return (
-            <div
-              key={vehicle.id}
-              className="bg-white border border-slate-200 hover:border-blue-300 rounded-2xl p-5 flex flex-col justify-between transition shadow-xs group"
-            >
-              <div>
-                {/* Card Top */}
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div>
-                    <span className="font-mono font-bold text-lg text-slate-800 tracking-tight">
-                      {vehicle.nopol}
-                    </span>
-                    <p className="text-xs font-medium text-slate-600">
-                      {vehicle.brand} {vehicle.model}
-                    </p>
-                    <span className="text-[11px] text-slate-400">{vehicle.type} ({vehicle.year})</span>
-                  </div>
-
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    vehicle.status === 'active'
-                      ? 'bg-green-50 text-green-700 border border-green-200/60'
-                      : vehicle.status === 'maintenance'
-                      ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
-                      : 'bg-blue-50 text-blue-700 border border-blue-200/60'
-                  }`}>
-                    {vehicle.status === 'active' ? 'AKTIF' : vehicle.status === 'maintenance' ? 'SERVICE' : 'STANDBY'}
-                  </span>
-                </div>
-
-                {/* Key Metrics */}
-                <div className="grid grid-cols-2 gap-2 my-3 p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs">
-                  <div>
-                    <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
-                      <Gauge className="w-3 h-3 text-blue-600" /> Odometer
-                    </span>
-                    <p className="font-mono font-bold text-slate-800 mt-0.5">{formatNumber(vehicle.currentOdometer)} KM</p>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
-                      <User className="w-3 h-3 text-slate-500" /> Pengemudi
-                    </span>
-                    <p className="font-medium text-slate-700 truncate mt-0.5">{vehicle.assignedDriver || '-'}</p>
-                  </div>
-                </div>
-
-                {/* Tax Badges Preview */}
-                <div className="space-y-1.5 text-[11px]">
-                  <div className="flex items-center justify-between text-slate-500">
-                    <span>Pajak STNK 1 Thn:</span>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
-                      stnk1Badge.status === 'urgent' || stnk1Badge.status === 'overdue'
-                        ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
-                        : 'bg-slate-100 text-slate-600'
-                    }`}>
-                      {stnk1Badge.label}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-slate-500">
-                    <span>Uji KIR Dishub:</span>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
-                      kirBadge.status === 'urgent' || kirBadge.status === 'overdue'
-                        ? 'bg-red-50 text-red-700 border border-red-200/60'
-                        : 'bg-slate-100 text-slate-600'
-                    }`}>
-                      {kirBadge.label}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                <button
-                  onClick={() => onSelectVehicleForDetail(vehicle)}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-medium border border-slate-200 transition"
-                >
-                  <Eye className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Detail &amp; Histori</span>
-                </button>
-
-                {perms.canEditVehicle && (
-                  <button
-                    onClick={() => handleOpenEdit(vehicle)}
-                    className="p-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg transition"
-                    title="Edit Kendaraan"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </button>
+                    return (
+                      <tr
+                        key={vehicle.id}
+                        className="hover:bg-blue-50/40 transition group cursor-default"
+                      >
+                        <td className="py-3.5 px-4 text-center font-mono text-slate-400 text-[11px]">
+                          {rowNumber}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-slate-900 tracking-tight text-[13px] bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                              {vehicle.nopol}
+                            </span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${
+                              vehicle.status === 'active'
+                                ? 'bg-green-50 text-green-700 border border-green-200/60'
+                                : vehicle.status === 'maintenance'
+                                ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
+                                : 'bg-blue-50 text-blue-700 border border-blue-200/60'
+                            }`}>
+                              {vehicle.status === 'active' ? 'AKTIF' : vehicle.status === 'maintenance' ? 'SERVICE' : 'STANDBY'}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div>
+                            <p className="font-bold text-slate-800 leading-tight">
+                              {vehicle.brand} {vehicle.model}
+                            </p>
+                            <p className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                              <span>{vehicle.type}</span>
+                              <span>•</span>
+                              <span>{vehicle.year}</span>
+                              <span>•</span>
+                              <span>{vehicle.fuelType}</span>
+                            </p>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-1.5">
+                            <Building2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                            <div>
+                              <span className="font-semibold text-slate-800 text-[11px] block">
+                                {vehicle.ownerCompany || 'PT Transindo Logistik'}
+                              </span>
+                              <span className="text-[10px] text-slate-400">Aset Armada</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-1.5">
+                            <Gauge className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                            <div>
+                              <span className="font-mono font-bold text-slate-800">
+                                {formatNumber(vehicle.currentOdometer)} KM
+                              </span>
+                              {vehicle.targetKmPerLiter ? (
+                                <span className="text-[10px] text-slate-400 block">
+                                  Target: {vehicle.targetKmPerLiter} KM/L
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-1.5">
+                            <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <div>
+                              <p className="font-semibold text-slate-800">
+                                {vehicle.assignedDriver || '-'}
+                              </p>
+                              {vehicle.driverPhone && (
+                                <p className="text-[11px] text-slate-400 font-mono">
+                                  {vehicle.driverPhone}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div>
+                            <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-semibold ${
+                              stnk1Badge.status === 'urgent' || stnk1Badge.status === 'overdue'
+                                ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
+                                : 'bg-slate-100 text-slate-600'
+                            }`}>
+                              {stnk1Badge.label}
+                            </span>
+                            {vehicle.stnk1YearDate && (
+                              <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                                {vehicle.stnk1YearDate}
+                              </p>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div>
+                            <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-semibold ${
+                              kirBadge.status === 'urgent' || kirBadge.status === 'overdue'
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200/60'
+                                : 'bg-slate-100 text-slate-600'
+                            }`}>
+                              {kirBadge.label}
+                            </span>
+                            {vehicle.kirDate && (
+                              <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                                {vehicle.kirDate}
+                              </p>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className="text-[11px] font-mono text-slate-600">
+                            {vehicle.stnk5YearDate || '-'}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <span className="font-mono font-semibold text-slate-700">
+                            {vehicle.capacityTon ? `${vehicle.capacityTon} Ton` : '-'}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              onClick={() => onSelectVehicleForDetail(vehicle)}
+                              className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold border border-blue-200/70 transition"
+                              title="Detail & Histori Lengkap"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>Detail</span>
+                            </button>
+                            {perms.canEditVehicle && (
+                              <button
+                                onClick={() => handleOpenEdit(vehicle)}
+                                className="p-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-lg transition"
+                                title="Edit Kendaraan"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            {perms.canDeleteVehicle && (
+                              <button
+                                onClick={() => handleDelete(vehicle.id, vehicle.nopol)}
+                                className="p-1.5 bg-white border border-slate-200 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition"
+                                title="Hapus Kendaraan"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
+              </tbody>
+            </table>
+          </div>
 
-                {perms.canDeleteVehicle && (
-                  <button
-                    onClick={() => handleDelete(vehicle.id, vehicle.nopol)}
-                    className="p-2 bg-white border border-slate-200 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition"
-                    title="Hapus Kendaraan"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                )}
+          {/* Table Summary & Pagination Footer */}
+          <div className="border-t border-slate-200">
+            <div className="px-4 py-2.5 bg-slate-50 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2 border-b border-slate-200/60">
+              <span>
+                Total terdaftar: <strong>{vehicles.length}</strong> unit armada
+              </span>
+              <div className="flex items-center gap-3 text-[11px]">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <span>Aktif: <strong>{vehicles.filter(v => v.status === 'active').length}</strong></span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                  <span>Service: <strong>{vehicles.filter(v => v.status === 'maintenance').length}</strong></span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                  <span>Standby: <strong>{vehicles.filter(v => v.status === 'standby').length}</strong></span>
+                </span>
               </div>
             </div>
-          );
-        })}
-      </div>
+            <TablePagination
+              currentPage={currentPage}
+              totalItems={totalFilteredVehicles}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={setPageSize}
+              pageSizeOptions={[6, 12, 24, 48]}
+              itemLabel="unit armada"
+            />
+          </div>
+        </div>
+      ) : (
+        /* Vehicles Grid (Kartu Kotak) */
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {paginatedVehicles.map((vehicle) => {
+              const stnk1Badge = getTaxDueBadgeInfo(vehicle.stnk1YearDate);
+              const kirBadge = getTaxDueBadgeInfo(vehicle.kirDate);
+
+              return (
+                <div
+                  key={vehicle.id}
+                  className="bg-white border border-slate-200 hover:border-blue-300 rounded-2xl p-5 flex flex-col justify-between transition shadow-xs group"
+                >
+                  <div>
+                    {/* Card Top */}
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div>
+                        <span className="font-mono font-bold text-lg text-slate-800 tracking-tight">
+                          {vehicle.nopol}
+                        </span>
+                        <p className="text-xs font-medium text-slate-600">
+                          {vehicle.brand} {vehicle.model}
+                        </p>
+                        <span className="text-[11px] text-slate-400">{vehicle.type} ({vehicle.year})</span>
+                        <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-semibold text-slate-700 bg-slate-50 px-2 py-0.5 rounded border border-slate-100 w-fit">
+                          <Building2 className="w-3 h-3 text-blue-600 shrink-0" />
+                          <span className="truncate max-w-[190px]">{vehicle.ownerCompany || 'PT Transindo Logistik'}</span>
+                        </div>
+                      </div>
+
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        vehicle.status === 'active'
+                          ? 'bg-green-50 text-green-700 border border-green-200/60'
+                          : vehicle.status === 'maintenance'
+                          ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
+                          : 'bg-blue-50 text-blue-700 border border-blue-200/60'
+                      }`}>
+                        {vehicle.status === 'active' ? 'AKTIF' : vehicle.status === 'maintenance' ? 'SERVICE' : 'STANDBY'}
+                      </span>
+                    </div>
+
+                    {/* Key Metrics */}
+                    <div className="grid grid-cols-2 gap-2 my-3 p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
+                          <Gauge className="w-3 h-3 text-blue-600" /> Odometer
+                        </span>
+                        <p className="font-mono font-bold text-slate-800 mt-0.5">{formatNumber(vehicle.currentOdometer)} KM</p>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
+                          <User className="w-3 h-3 text-slate-500" /> Pengemudi
+                        </span>
+                        <p className="font-medium text-slate-700 truncate mt-0.5">{vehicle.assignedDriver || '-'}</p>
+                      </div>
+                    </div>
+
+                    {/* Tax Badges Preview */}
+                    <div className="space-y-1.5 text-[11px]">
+                      <div className="flex items-center justify-between text-slate-500">
+                        <span>Pajak STNK 1 Thn:</span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                          stnk1Badge.status === 'urgent' || stnk1Badge.status === 'overdue'
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
+                            : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {stnk1Badge.label}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-500">
+                        <span>Uji KIR Dishub:</span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                          kirBadge.status === 'urgent' || kirBadge.status === 'overdue'
+                            ? 'bg-red-50 text-red-700 border border-red-200/60'
+                            : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {kirBadge.label}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                    <button
+                      onClick={() => onSelectVehicleForDetail(vehicle)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-medium border border-slate-200 transition"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Detail &amp; Histori</span>
+                    </button>
+
+                    {perms.canEditVehicle && (
+                      <button
+                        onClick={() => handleOpenEdit(vehicle)}
+                        className="p-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg transition"
+                        title="Edit Kendaraan"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+
+                    {perms.canDeleteVehicle && (
+                      <button
+                        onClick={() => handleDelete(vehicle.id, vehicle.nopol)}
+                        className="p-2 bg-white border border-slate-200 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition"
+                        title="Hapus Kendaraan"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Grid View Pagination */}
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+            <TablePagination
+              currentPage={currentPage}
+              totalItems={totalFilteredVehicles}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={setPageSize}
+              pageSizeOptions={[6, 12, 24, 48]}
+              itemLabel="unit armada"
+            />
+          </div>
+        </div>
+      )}
+      </>
+      )}
 
       {/* Modal Add / Edit Vehicle */}
       {isModalOpen && (
@@ -412,6 +784,36 @@ export const VehicleList: React.FC<VehicleListProps> = ({
 
             <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="col-span-1 sm:col-span-2">
+                  <label className="text-slate-700 font-semibold block mb-1">
+                    Nama Pemilik Kendaraan / Perusahaan Aset *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      required
+                      list="company-owner-list"
+                      placeholder="Contoh: PT Transindo Logistik / PT Sinar Surya Persada / CV Maju Jaya"
+                      value={formData.ownerCompany || ''}
+                      onChange={(e) => setFormData({ ...formData, ownerCompany: e.target.value })}
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-800 font-semibold focus:outline-hidden focus:border-blue-500"
+                    />
+                    <datalist id="company-owner-list">
+                      <option value="PT Transindo Logistik" />
+                      <option value="PT Sinar Surya Persada" />
+                      <option value="CV Maju Jaya Logistik" />
+                      <option value="PT Bahtera Kencana" />
+                      <option value="Milik Pribadi (Owner)" />
+                      {uniqueCompanies.map((comp) => (
+                        <option key={comp} value={comp} />
+                      ))}
+                    </datalist>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Digunakan untuk mencatat daftar aset inventaris perusahaan dan cetak laporan armada.
+                  </p>
+                </div>
+
                 <div>
                   <label className="text-slate-700 font-semibold block mb-1">Nomor Polisi (Nopol) *</label>
                   <input

@@ -12,7 +12,8 @@ import {
   MapPin,
   Calendar,
   AlertTriangle,
-  ArrowRight
+  ArrowRight,
+  Building2
 } from 'lucide-react';
 import {
   Vehicle,
@@ -105,7 +106,7 @@ export const VehicleDetailModal: React.FC<VehicleDetailModalProps> = ({
                 </span>
               </div>
               <p className="text-[11px] sm:text-xs text-slate-400 truncate max-w-xs sm:max-w-md">
-                {vehicle.brand} {vehicle.model} &bull; {vehicle.type} ({vehicle.year}) &bull; Driver: <span className="font-semibold text-slate-700">{vehicle.assignedDriver || '-'}</span>
+                {vehicle.brand} {vehicle.model} &bull; {vehicle.type} ({vehicle.year}) &bull; Pemilik: <span className="font-semibold text-blue-700">{vehicle.ownerCompany || 'PT Transindo Logistik'}</span> &bull; Driver: <span className="font-semibold text-slate-700">{vehicle.assignedDriver || '-'}</span>
               </p>
             </div>
           </div>
@@ -184,8 +185,20 @@ export const VehicleDetailModal: React.FC<VehicleDetailModalProps> = ({
               {/* Vehicle Specs & Legal Status */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-3">
-                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Spesifikasi Kendaraan</h4>
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center justify-between">
+                    <span>Spesifikasi Kendaraan</span>
+                    <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 flex items-center gap-1">
+                      <Building2 className="w-3 h-3" />
+                      {vehicle.ownerCompany || 'PT Transindo Logistik'}
+                    </span>
+                  </h4>
                   <div className="grid grid-cols-2 gap-2 text-xs divide-y divide-slate-100">
+                    <div className="pt-2 col-span-2 flex items-center justify-between bg-slate-50 p-2 rounded-lg border border-slate-100">
+                      <span className="text-slate-500 font-medium flex items-center gap-1.5">
+                        <Building2 className="w-3.5 h-3.5 text-blue-600" /> Pemilik Aset:
+                      </span>
+                      <span className="font-bold text-slate-800">{vehicle.ownerCompany || 'PT Transindo Logistik'}</span>
+                    </div>
                     <div className="pt-2"><span className="text-slate-400">Nomor Rangka:</span> <p className="font-mono font-medium text-slate-700">{vehicle.chassisNumber || '-'}</p></div>
                     <div className="pt-2"><span className="text-slate-400">Nomor Mesin:</span> <p className="font-mono font-medium text-slate-700">{vehicle.engineNumber || '-'}</p></div>
                     <div className="pt-2"><span className="text-slate-400">Kapasitas Muatan:</span> <p className="font-medium text-slate-700">{vehicle.capacityTon} Ton</p></div>

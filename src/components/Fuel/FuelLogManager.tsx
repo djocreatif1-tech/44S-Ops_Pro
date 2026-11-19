@@ -6,9 +6,12 @@ import {
   Trash2,
   Edit2,
   X,
-  Lock
+  Lock,
+  Eye,
+  FileText,
+  Receipt
 } from 'lucide-react';
-import { FuelLog, Vehicle, FuelType, UserRole } from '../../types';
+import { FuelLog, Vehicle, FuelType, UserRole, Driver } from '../../types';
 import {
   formatRupiah,
   formatNumber,
@@ -19,10 +22,16 @@ import { exportFuelToExcel, exportFuelToPDF } from '../../utils/exportUtils';
 import { ModuleFilterExportBar } from '../Common/ModuleFilterExportBar';
 import { getRolePermissions } from '../../utils/permissions';
 import { RoleRestrictedBanner } from '../Common/RoleRestrictedBanner';
+import { TablePagination } from '../Common/TablePagination';
+import { confirmDelete } from '../../utils/dialogService';
+import { ReceiptUploadField } from '../Common/ReceiptUploadField';
+import { ModuleAnalyticsPanel } from '../Common/ModuleAnalyticsPanel';
+import { BarChart3, ListFilter } from 'lucide-react';
 
 interface FuelLogManagerProps {
   fuelLogs: FuelLog[];
   vehicles: Vehicle[];
+  drivers?: Driver[];
   userRole?: UserRole;
   onOpenRoleMatrix?: () => void;
   onAddFuelLog: (log: FuelLog) => void;
@@ -33,6 +42,7 @@ interface FuelLogManagerProps {
 export const FuelLogManager: React.FC<FuelLogManagerProps> = ({
   fuelLogs = [],
   vehicles = [],
+  drivers = [],
   userRole = 'owner',
   onOpenRoleMatrix,
   onAddFuelLog,
@@ -41,16 +51,50 @@ export const FuelLogManager: React.FC<FuelLogManagerProps> = ({
 }) => {
   const safeFuelLogs = Array.isArray(fuelLogs) ? fuelLogs : [];
   const safeVehicles = Array.isArray(vehicles) ? vehicles : [];
+  const safeDrivers = Array.isArray(drivers) ? drivers : [];
   const perms = getRolePermissions(userRole);
+  const [moduleView, setModuleView] = useState<'data' | 'analytics'>('data');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedVehicleFilter, setSelectedVehicleFilter] = useState('all');
+  const [selectedCompany, setSelectedCompany] = useState<string>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+
+  const getFuelCompany = (log: FuelLog) => {
+    const v = safeVehicles.find(veh => veh.id === log.vehicleId || veh.nopol === log.nopol);
+    return v?.ownerCompany || 'Perusahaan Umum / Lainnya';
+  };
+
+  const companies = Array.from(
+    new Set([
+      ...safeVehicles.map(v => v.ownerCompany).filter(Boolean),
+      ...safeFuelLogs.map(l => getFuelCompany(l)).filter(Boolean)
+    ])
+  );
+
+  const companySummaries = companies.map((comp) => {
+    const compLogs = safeFuelLogs.filter((l) => {
+      if (!l) return false;
+      if (startDate && l.date < startDate) return false;
+      if (endDate && l.date > endDate) return false;
+      return getFuelCompany(l) === comp;
+    });
+    return {
+      companyName: comp,
+      count: compLogs.length,
+      totalExpense: compLogs.reduce((sum, l) => sum + (l.totalCost || 0), 0),
+    };
+  });
+  
+  // Pagination State (Next Halaman)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedLog, setSelectedLog] = useState<FuelLog | null>(null);
+  const [inspectedReceiptLog, setInspectedReceiptLog] = useState<FuelLog | null>(null);
 
   // Form State (Add)
   const [selectedVehicleId, setSelectedVehicleId] = useState(safeVehicles[0]?.id || '');
@@ -64,6 +108,7 @@ export const FuelLogManager: React.FC<FuelLogManagerProps> = ({
   const [fuelStation, setFuelStation] = useState('SPBU Pertamina Rest Area');
   const [isFullTank, setIsFullTank] = useState(true);
   const [receiptNumber, setReceiptNumber] = useState('');
+  const [receiptProofUrl, setReceiptProofUrl] = useState('');
   const [notes, setNotes] = useState('');
 
   // Form State (Edit)
@@ -80,6 +125,7 @@ export const FuelLogManager: React.FC<FuelLogManagerProps> = ({
     fuelStation: '',
     isFullTank: true,
     receiptNumber: '',
+    receiptProofUrl: '',
     notes: ''
   });
 
@@ -118,19 +164,26 @@ export const FuelLogManager: React.FC<FuelLogManagerProps> = ({
   // Filtered Logs
   const filteredLogs = safeFuelLogs.filter((log) => {
     if (!log) return false;
+    const compName = getFuelCompany(log);
     const q = (searchQuery || '').toLowerCase();
     const matchesSearch =
       (log.nopol || '').toLowerCase().includes(q) ||
       (log.driverName || '').toLowerCase().includes(q) ||
-      ((log.fuelStation || '').toLowerCase().includes(q));
+      ((log.fuelStation || '').toLowerCase().includes(q)) ||
+      compName.toLowerCase().includes(q);
     const matchesVehicle = selectedVehicleFilter === 'all' || log.vehicleId === selectedVehicleFilter || log.nopol === selectedVehicleFilter;
+    const matchesCompany = selectedCompany === 'all' || compName === selectedCompany;
     
     // Date Range filter
     const matchesStartDate = !startDate || log.date >= startDate;
     const matchesEndDate = !endDate || log.date <= endDate;
 
-    return matchesSearch && matchesVehicle && matchesStartDate && matchesEndDate;
+    return matchesSearch && matchesVehicle && matchesCompany && matchesStartDate && matchesEndDate;
   });
+
+  // Paginated Logs for Next / Prev Pages
+  const totalFilteredLogs = filteredLogs.length;
+  const paginatedLogs = filteredLogs.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const dateRangeText = startDate && endDate
     ? `${startDate} s/d ${endDate}`
@@ -153,12 +206,15 @@ export const FuelLogManager: React.FC<FuelLogManagerProps> = ({
     e.preventDefault();
     const v = vehicles.find(veh => veh.id === selectedVehicleId);
     const nopol = v ? v.nopol : 'B 0000 XX';
+    const matchedDrv = safeDrivers.find(d => d.name.toLowerCase() === driverName.toLowerCase());
 
     const newLog: FuelLog = {
       id: 'FL-' + Date.now().toString().slice(-4),
       vehicleId: selectedVehicleId,
       nopol,
+      driverId: matchedDrv?.id,
       driverName,
+      driverNip: matchedDrv?.nip,
       date: logDate,
       fuelType,
       volumeLiters: Number(volumeLiters) || 0,
@@ -171,10 +227,12 @@ export const FuelLogManager: React.FC<FuelLogManagerProps> = ({
       fuelStation,
       isFullTank,
       receiptNumber,
+      receiptProofUrl: receiptProofUrl || undefined,
       notes
     };
 
     onAddFuelLog(newLog);
+    setReceiptProofUrl('');
     setIsModalOpen(false);
   };
 
@@ -193,6 +251,7 @@ export const FuelLogManager: React.FC<FuelLogManagerProps> = ({
       fuelStation: log.fuelStation,
       isFullTank: log.isFullTank,
       receiptNumber: log.receiptNumber || '',
+      receiptProofUrl: log.receiptProofUrl || '',
       notes: log.notes || ''
     });
     setIsEditModalOpen(true);
@@ -222,6 +281,7 @@ export const FuelLogManager: React.FC<FuelLogManagerProps> = ({
       fuelStation: editFormData.fuelStation,
       isFullTank: editFormData.isFullTank,
       receiptNumber: editFormData.receiptNumber,
+      receiptProofUrl: editFormData.receiptProofUrl || undefined,
       notes: editFormData.notes
     };
 
@@ -254,25 +314,67 @@ export const FuelLogManager: React.FC<FuelLogManagerProps> = ({
             Pencatatan pengisian bahan bakar, analisa rasio efisiensi kilometer per liter (KM/L)
           </p>
         </div>
-        {perms.canAddFuelLog ? (
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-lg shadow-xs active:scale-95 transition"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Catat Pengisian BBM</span>
-          </button>
-        ) : (
-          <button
-            disabled
-            className="flex items-center gap-2 px-3.5 py-2 bg-slate-100 text-slate-400 font-medium text-xs rounded-lg cursor-not-allowed border border-slate-200"
-            title="Akses dibatasi sesuai peran pengguna"
-          >
-            <Lock className="w-3.5 h-3.5" />
-            <span>Catat BBM (Terkunci)</span>
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* View Mode Toggle: Data vs Analytics */}
+          <div className="flex items-center gap-1 bg-slate-200/70 p-1 rounded-xl border border-slate-200 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setModuleView('data')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                moduleView === 'data'
+                  ? 'bg-white text-blue-700 shadow-xs border border-slate-200/80'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <ListFilter className="w-3.5 h-3.5" />
+              <span>Log Pengisian BBM</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setModuleView('analytics')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                moduleView === 'analytics'
+                  ? 'bg-indigo-600 text-white shadow-xs border border-indigo-700'
+                  : 'text-indigo-700 hover:bg-indigo-50'
+              }`}
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>Laporan &amp; Analitik BBM</span>
+            </button>
+          </div>
+
+          {perms.canAddFuelLog ? (
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-lg shadow-xs active:scale-95 transition"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Catat Pengisian BBM</span>
+            </button>
+          ) : (
+            <button
+              disabled
+              className="flex items-center gap-2 px-3.5 py-2 bg-slate-100 text-slate-400 font-medium text-xs rounded-lg cursor-not-allowed border border-slate-200"
+              title="Akses dibatasi sesuai peran pengguna"
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span>Catat BBM (Terkunci)</span>
+            </button>
+          )}
+        </div>
       </div>
+
+      {moduleView === 'analytics' ? (
+        <ModuleAnalyticsPanel
+          moduleType="fuel"
+          title="Laporan & Analitik Konsumsi BBM Solar"
+          subtitle="Analisis pengeluaran solar, volume liter, jarak tempuh (KM) & rasio efisiensi mesin (KM/Liter) per armada"
+          fuelLogs={safeFuelLogs}
+          vehicles={safeVehicles}
+          drivers={safeDrivers}
+        />
+      ) : (
+      <>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -313,6 +415,13 @@ export const FuelLogManager: React.FC<FuelLogManagerProps> = ({
         totalFilteredCount={filteredLogs.length}
         totalAllCount={fuelLogs.length}
         moduleLabel="Catatan BBM"
+        companies={companies}
+        selectedCompany={selectedCompany}
+        onCompanyChange={(val) => {
+          setSelectedCompany(val);
+          setCurrentPage(1);
+        }}
+        companySummaries={companySummaries}
       >
         <div className="relative w-full md:w-64">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -320,14 +429,20 @@ export const FuelLogManager: React.FC<FuelLogManagerProps> = ({
             type="text"
             placeholder="Cari Nopol, Supir, SPBU..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
             className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-4 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-blue-500 focus:bg-white"
           />
         </div>
 
         <select
           value={selectedVehicleFilter}
-          onChange={(e) => setSelectedVehicleFilter(e.target.value)}
+          onChange={(e) => {
+            setSelectedVehicleFilter(e.target.value);
+            setCurrentPage(1);
+          }}
           className="w-full md:w-auto bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-hidden focus:border-blue-500 font-medium"
         >
           <option value="all">Semua Unit Kendaraan</option>
@@ -348,12 +463,13 @@ export const FuelLogManager: React.FC<FuelLogManagerProps> = ({
                 <th className="py-3 px-5">BBM &amp; Volume</th>
                 <th className="py-3 px-5">Odometer &amp; Jarak</th>
                 <th className="py-3 px-5">Efisiensi (Km/L)</th>
+                <th className="py-3 px-5 text-center">Nota Struk</th>
                 <th className="py-3 px-5 text-right">Total Biaya (Rp)</th>
                 <th className="py-3 px-5 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredLogs.map((log) => {
+              {paginatedLogs.map((log) => {
                 const vehicle = vehicles.find(v => v.id === log.vehicleId || v.nopol === log.nopol);
                 const target = vehicle ? vehicle.targetKmPerLiter : 5;
                 const effStatus = getFuelEfficiencyStatus(log.calculatedKmPerLiter, target);
@@ -366,7 +482,16 @@ export const FuelLogManager: React.FC<FuelLogManagerProps> = ({
                     </td>
                     <td className="py-3.5 px-5">
                       <p className="font-mono font-bold text-slate-800">{log.nopol}</p>
-                      <p className="text-[11px] text-slate-500 font-medium">{log.driverName}</p>
+                      <p className="text-[11px] text-slate-600 font-semibold">{log.driverName}</p>
+                      {(() => {
+                        const matchedDrv = safeDrivers.find(d => d.name.toLowerCase() === (log.driverName || '').toLowerCase());
+                        const nip = log.driverNip || matchedDrv?.nip;
+                        return nip ? (
+                          <span className="text-[9px] font-mono font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded inline-block mt-0.5">
+                            {nip}
+                          </span>
+                        ) : null;
+                      })()}
                     </td>
                     <td className="py-3.5 px-5">
                       <span className="font-medium text-slate-700">{log.fuelType}</span>
@@ -383,6 +508,23 @@ export const FuelLogManager: React.FC<FuelLogManagerProps> = ({
                           {effStatus.text}
                         </span>
                       </div>
+                    </td>
+                    <td className="py-3.5 px-5 text-center">
+                      {log.receiptProofUrl ? (
+                        <button
+                          type="button"
+                          onClick={() => setInspectedReceiptLog(log)}
+                          className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[10px] font-bold inline-flex items-center gap-1 transition"
+                          title="Lihat Foto Struk / Nota SPBU"
+                        >
+                          <Eye className="w-3 h-3" />
+                          <span>Lihat Nota</span>
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {log.receiptNumber || '-'}
+                        </span>
+                      )}
                     </td>
                     <td className="py-3.5 px-5 text-right font-mono font-bold text-slate-800">
                       {formatRupiah(log.totalCost)}
@@ -401,7 +543,9 @@ export const FuelLogManager: React.FC<FuelLogManagerProps> = ({
                         {perms.canDeleteFuelLog && (
                           <button
                             onClick={() => {
-                              if (confirm(`Hapus catatan BBM unit ${log.nopol} tanggal ${log.date}?`)) onDeleteFuelLog(log.id);
+                              confirmDelete(`Hapus catatan BBM unit ${log.nopol} tanggal ${log.date}?`).then((ok) => {
+                                if (ok) onDeleteFuelLog(log.id);
+                              });
                             }}
                             className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg border border-slate-200 transition"
                             title="Hapus Log BBM"
@@ -416,7 +560,7 @@ export const FuelLogManager: React.FC<FuelLogManagerProps> = ({
               })}
               {filteredLogs.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-400">
+                  <td colSpan={8} className="py-8 text-center text-slate-400">
                     Belum ada data pengisian BBM
                   </td>
                 </tr>
@@ -424,7 +568,20 @@ export const FuelLogManager: React.FC<FuelLogManagerProps> = ({
             </tbody>
           </table>
         </div>
+
+        {/* Table Pagination with Next / Prev */}
+        <TablePagination
+          currentPage={currentPage}
+          totalItems={totalFilteredLogs}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+          pageSizeOptions={[5, 10, 20, 50]}
+          itemLabel="catatan BBM"
+        />
       </div>
+      </>
+      )}
 
       {/* Modal Add Fuel Log */}
       {isModalOpen && (
@@ -459,13 +616,21 @@ export const FuelLogManager: React.FC<FuelLogManagerProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-slate-700 font-semibold block mb-1">Nama Supir / Pengemudi</label>
-                  <input
-                    type="text"
+                  <label className="text-slate-700 font-semibold block mb-1">Karyawan Driver Penerima BBM *</label>
+                  <select
                     value={driverName}
                     onChange={(e) => setDriverName(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-hidden focus:border-blue-500"
-                  />
+                    className="w-full bg-emerald-50/40 border border-emerald-200 rounded-lg px-3 py-2 text-slate-800 font-semibold focus:outline-hidden focus:border-emerald-500"
+                  >
+                    {safeDrivers.map((d) => (
+                      <option key={d.id} value={d.name}>
+                        [{d.nip || d.id}] {d.name} ({d.assignedVehicle || 'Pool'})
+                      </option>
+                    ))}
+                    {driverName && !safeDrivers.some(d => d.name === driverName) && (
+                      <option value={driverName}>{driverName}</option>
+                    )}
+                  </select>
                 </div>
 
                 <div>
@@ -576,6 +741,12 @@ export const FuelLogManager: React.FC<FuelLogManagerProps> = ({
                 </div>
               </div>
 
+              <ReceiptUploadField
+                label="Upload Struk / Nota SPBU Solar"
+                value={receiptProofUrl}
+                onChange={setReceiptProofUrl}
+              />
+
               <div>
                 <label className="text-slate-700 font-semibold block mb-1">Catatan Tambahan</label>
                 <textarea
@@ -640,13 +811,21 @@ export const FuelLogManager: React.FC<FuelLogManagerProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-slate-700 font-semibold block mb-1">Nama Supir</label>
-                  <input
-                    type="text"
+                  <label className="text-slate-700 font-semibold block mb-1">Karyawan Driver Penerima BBM</label>
+                  <select
                     value={editFormData.driverName}
                     onChange={(e) => setEditFormData({ ...editFormData, driverName: e.target.value })}
-                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-hidden focus:border-blue-500"
-                  />
+                    className="w-full bg-emerald-50/40 border border-emerald-200 rounded-lg px-3 py-2 text-slate-800 font-semibold focus:outline-hidden focus:border-emerald-500"
+                  >
+                    {safeDrivers.map((d) => (
+                      <option key={d.id} value={d.name}>
+                        [{d.nip || d.id}] {d.name} ({d.assignedVehicle || 'Pool'})
+                      </option>
+                    ))}
+                    {editFormData.driverName && !safeDrivers.some(d => d.name === editFormData.driverName) && (
+                      <option value={editFormData.driverName}>{editFormData.driverName}</option>
+                    )}
+                  </select>
                 </div>
 
                 <div>
@@ -756,6 +935,12 @@ export const FuelLogManager: React.FC<FuelLogManagerProps> = ({
                 </div>
               </div>
 
+              <ReceiptUploadField
+                label="Upload / Ganti Struk / Nota SPBU Solar"
+                value={editFormData.receiptProofUrl}
+                onChange={(url) => setEditFormData({ ...editFormData, receiptProofUrl: url })}
+              />
+
               <div>
                 <label className="text-slate-700 font-semibold block mb-1">Catatan</label>
                 <textarea
@@ -782,6 +967,64 @@ export const FuelLogManager: React.FC<FuelLogManagerProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Preview Struk / Nota BBM */}
+      {inspectedReceiptLog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50">
+              <div className="flex items-center gap-2">
+                <Receipt className="w-4 h-4 text-blue-600" />
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900">
+                    Struk / Nota SPBU: {inspectedReceiptLog.nopol}
+                  </h4>
+                  <p className="text-[10px] text-slate-400">
+                    {formatDateIndo(inspectedReceiptLog.date)} • {inspectedReceiptLog.fuelStation} • {formatRupiah(inspectedReceiptLog.totalCost)}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setInspectedReceiptLog(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4 bg-slate-100 flex items-center justify-center min-h-[300px] max-h-[480px] overflow-auto">
+              {inspectedReceiptLog.receiptProofUrl?.startsWith('data:application/pdf') ? (
+                <iframe
+                  src={inspectedReceiptLog.receiptProofUrl}
+                  title="Nota SPBU PDF"
+                  className="w-full h-[420px] rounded-lg border border-slate-200 bg-white"
+                />
+              ) : inspectedReceiptLog.receiptProofUrl ? (
+                <img
+                  src={inspectedReceiptLog.receiptProofUrl}
+                  alt="Nota SPBU"
+                  className="max-w-full max-h-[440px] object-contain rounded-lg shadow-sm"
+                />
+              ) : (
+                <div className="text-center text-slate-400 text-xs">
+                  <FileText className="w-8 h-8 mx-auto mb-2" />
+                  Belum ada nota terlampir.
+                </div>
+              )}
+            </div>
+            <div className="px-5 py-3 bg-white border-t border-slate-100 flex items-center justify-between text-xs">
+              <span className="text-slate-500 font-mono">
+                No. Struk: {inspectedReceiptLog.receiptNumber || '-'}
+              </span>
+              <button
+                onClick={() => setInspectedReceiptLog(null)}
+                className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg"
+              >
+                Tutup
+              </button>
+            </div>
           </div>
         </div>
       )}
