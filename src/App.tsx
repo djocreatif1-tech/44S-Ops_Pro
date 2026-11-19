@@ -190,14 +190,9 @@ export function App() {
       const res = await fetchAppDataFromGAS(cfg.webAppUrl);
       if (res.success && res.data) {
         const d = res.data;
-        let hadDummyInCloud = false;
         const cleanCloudArray = <T,>(arr: unknown): T[] => {
           if (!Array.isArray(arr)) return [];
-          const stripped = stripDummyRecords<T>(arr as T[]);
-          if (stripped.length !== arr.length) {
-            hadDummyInCloud = true;
-          }
-          return stripped;
+          return stripDummyRecords<T>(arr as T[]);
         };
 
         if (Array.isArray(d.vehicles)) {
@@ -288,11 +283,6 @@ export function App() {
           const cleanMovs = cleanCloudArray<SparepartStockMovement>((d as any).sparepartMovements);
           setSparepartMovements(cleanMovs);
           saveStoredData({ sparepartMovements: cleanMovs });
-        }
-
-        // Jika di Google Spreadsheet masih tersisa baris data dummy lama, hapus otomatis dari Spreadsheet
-        if (hadDummyInCloud) {
-          await syncToGoogleAppsScript(cfg.webAppUrl, 'purgeDummyData', {});
         }
 
         if (!silent) showToast('Data disinkronkan real-time dari database utama Google Sheets!');
@@ -689,7 +679,9 @@ export function App() {
   };
 
   const handleUpdateVehicle = (v: Vehicle) => {
-    const updated = vehicles.map(item => (item.id === v.id ? v : item));
+    if (!v?.id) return;
+    const targetId = String(v.id).trim();
+    const updated = vehicles.map(item => (String(item.id).trim() === targetId ? v : item));
     setVehicles(updated);
     createActivityLog(
       'vehicle',
@@ -707,22 +699,24 @@ export function App() {
   };
 
   const handleDeleteVehicle = (id: string) => {
-    const target = vehicles.find(v => v.id === id);
-    const updated = vehicles.filter(v => v.id !== id);
+    const targetId = String(id || '').trim();
+    if (!targetId) return;
+    const target = vehicles.find(v => String(v.id).trim() === targetId);
+    const updated = vehicles.filter(v => String(v.id).trim() !== targetId);
     setVehicles(updated);
     createActivityLog(
       'vehicle',
       'delete',
       'Hapus Unit Armada',
-      `Penghapusan unit armada ${target?.nopol || id} dari sistem operasional.`,
-      id,
-      target?.nopol || id,
+      `Penghapusan unit armada ${target?.nopol || targetId} dari sistem operasional.`,
+      targetId,
+      target?.nopol || targetId,
       undefined,
       'danger'
     );
     persistAll({ vehicles: updated });
-    pushToGas('deleteVehicle', { id });
-    showToast('Kendaraan berhasil dihapus', 'info');
+    pushToGas('deleteVehicle', { id: targetId });
+    showToast(`Kendaraan ${target?.nopol || targetId} berhasil dihapus`, 'info');
   };
 
   // --- Handlers: Taxes ---
@@ -745,7 +739,9 @@ export function App() {
   };
 
   const handleUpdateTax = (t: TaxRecord) => {
-    const updated = taxes.map(item => (item.id === t.id ? t : item));
+    if (!t?.id) return;
+    const targetId = String(t.id).trim();
+    const updated = taxes.map(item => (String(item.id).trim() === targetId ? t : item));
     setTaxes(updated);
     createActivityLog(
       'tax',
@@ -759,26 +755,28 @@ export function App() {
     );
     persistAll({ taxes: updated });
     pushToGas('updateTax', t);
-    showToast('Data pajak berhasil diperbarui!');
+    showToast(`Data pajak ${t.documentType} ${t.nopol} berhasil diperbarui!`);
   };
 
   const handleDeleteTax = (id: string) => {
-    const target = taxes.find(t => t.id === id);
-    const updated = taxes.filter(t => t.id !== id);
+    const targetId = String(id || '').trim();
+    if (!targetId) return;
+    const target = taxes.find(t => String(t.id).trim() === targetId);
+    const updated = taxes.filter(t => String(t.id).trim() !== targetId);
     setTaxes(updated);
     createActivityLog(
       'tax',
       'delete',
       'Hapus Jadwal Pajak',
-      `Penghapusan catatan pajak ${target?.documentType || ''} unit ${target?.nopol || id}.`,
-      id,
-      target?.nopol || id,
+      `Penghapusan catatan pajak ${target?.documentType || ''} unit ${target?.nopol || targetId}.`,
+      targetId,
+      target?.nopol || targetId,
       undefined,
       'danger'
     );
     persistAll({ taxes: updated });
-    pushToGas('deleteTax', { id });
-    showToast('Catatan pajak dihapus', 'info');
+    pushToGas('deleteTax', { id: targetId });
+    showToast(`Catatan pajak ${target?.nopol || targetId} dihapus`, 'info');
   };
 
   const handlePayTax = (
@@ -920,7 +918,9 @@ export function App() {
   };
 
   const handleUpdateFuelLog = (f: FuelLog) => {
-    const updated = fuelLogs.map(item => (item.id === f.id ? f : item));
+    if (!f?.id) return;
+    const targetId = String(f.id).trim();
+    const updated = fuelLogs.map(item => (String(item.id).trim() === targetId ? f : item));
     setFuelLogs(updated);
     createActivityLog(
       'fuel',
@@ -934,26 +934,28 @@ export function App() {
     );
     persistAll({ fuelLogs: updated });
     pushToGas('updateFuelLog', f);
-    showToast('Log BBM solar berhasil diperbarui!');
+    showToast(`Log BBM solar ${f.nopol} berhasil diperbarui!`);
   };
 
   const handleDeleteFuelLog = (id: string) => {
-    const target = fuelLogs.find(f => f.id === id);
-    const updated = fuelLogs.filter(f => f.id !== id);
+    const targetId = String(id || '').trim();
+    if (!targetId) return;
+    const target = fuelLogs.find(f => String(f.id).trim() === targetId);
+    const updated = fuelLogs.filter(f => String(f.id).trim() !== targetId);
     setFuelLogs(updated);
     createActivityLog(
       'fuel',
       'delete',
       'Hapus Log Pengisian Solar',
-      `Penghapusan log pengisian solar unit ${target?.nopol || id}.`,
-      id,
-      target?.nopol || id,
+      `Penghapusan log pengisian solar unit ${target?.nopol || targetId}.`,
+      targetId,
+      target?.nopol || targetId,
       undefined,
       'danger'
     );
     persistAll({ fuelLogs: updated });
-    pushToGas('deleteFuelLog', { id });
-    showToast('Log BBM dihapus', 'info');
+    pushToGas('deleteFuelLog', { id: targetId });
+    showToast(`Log BBM ${target?.nopol || targetId} dihapus`, 'info');
   };
 
   // --- Handlers: Finance ---
@@ -1021,7 +1023,9 @@ export function App() {
   };
 
   const handleUpdateFinance = (fin: OperationalFinance) => {
-    const updated = finances.map(item => (item.id === fin.id ? fin : item));
+    if (!fin?.id) return;
+    const targetId = String(fin.id).trim();
+    const updated = finances.map(item => (String(item.id).trim() === targetId ? fin : item));
     setFinances(updated);
     createActivityLog(
       'finance',
@@ -1035,14 +1039,16 @@ export function App() {
     );
     persistAll({ finances: updated });
     pushToGas('updateFinance', fin);
-    showToast('Data keuangan berhasil diperbarui!');
+    showToast(`Data transaksi ${fin.category} berhasil diperbarui!`);
   };
 
   const handleDeleteFinance = (id: string) => {
+    const targetId = String(id || '').trim();
+    if (!targetId) return;
     const safeAccounts = asArray<FinancialAccount>(accounts);
     const safeDeposits = asArray<CompanyDeposit>(companyDeposits);
-    const target = finances.find(f => f.id === id);
-    const updated = finances.filter(f => f.id !== id);
+    const target = finances.find(f => String(f.id).trim() === targetId);
+    const updated = finances.filter(f => String(f.id).trim() !== targetId);
     setFinances(updated);
 
     // Revert account balance
@@ -1092,14 +1098,14 @@ export function App() {
       'delete',
       'Hapus Transaksi Keuangan',
       `Penghapusan catatan transaksi ${target?.category || ''} sebesar ${formatRupiah(target?.amount || 0)}.`,
-      id,
-      target?.category || id,
+      targetId,
+      target?.category || targetId,
       undefined,
       'danger'
     );
     persistAll({ finances: updated, accounts: updatedAccounts, companyDeposits: updatedDeposits });
-    pushToGas('deleteFinance', { id });
-    showToast('Transaksi keuangan dihapus', 'info');
+    pushToGas('deleteFinance', { id: targetId });
+    showToast(`Transaksi ${target?.category || targetId} dihapus`, 'info');
   };
 
   // --- Handlers: Corporate Client Deposits ---
@@ -2055,7 +2061,9 @@ export function App() {
   };
 
   const handleUpdateTimesheet = (ts: DriverTimesheet) => {
-    const updated = timesheets.map(t => (t.id === ts.id ? ts : t));
+    if (!ts?.id) return;
+    const targetId = String(ts.id).trim();
+    const updated = timesheets.map(t => (String(t.id).trim() === targetId ? ts : t));
     setTimesheets(updated);
     createActivityLog(
       'timesheet',
@@ -2068,25 +2076,29 @@ export function App() {
       'primary'
     );
     persistAll({ timesheets: updated });
+    pushToGas('updateTimesheet', ts);
     showToast(`Timesheet supir ${ts.driverName} berhasil diperbarui!`);
   };
 
   const handleDeleteTimesheet = (id: string) => {
-    const target = timesheets.find(t => t.id === id);
-    const updated = timesheets.filter(t => t.id !== id);
+    const targetId = String(id || '').trim();
+    if (!targetId) return;
+    const target = timesheets.find(t => String(t.id).trim() === targetId);
+    const updated = timesheets.filter(t => String(t.id).trim() !== targetId);
     setTimesheets(updated);
     createActivityLog(
       'timesheet',
       'delete',
       'Hapus Time Sheet',
-      `Penghapusan log ritase supir ${target?.driverName || ''} (${target?.nopol || id}).`,
-      id,
-      target?.nopol || id,
+      `Penghapusan log ritase supir ${target?.driverName || ''} (${target?.nopol || targetId}).`,
+      targetId,
+      target?.nopol || targetId,
       undefined,
       'danger'
     );
     persistAll({ timesheets: updated });
-    showToast('Timesheet dihapus', 'info');
+    pushToGas('deleteTimesheet', { id: targetId });
+    showToast(`Timesheet ${target?.nopol || targetId} dihapus`, 'info');
   };
 
   // --- Handlers: Trip Sheet (Surat Jalan & Perjalanan) ---
@@ -2126,11 +2138,14 @@ export function App() {
     );
 
     persistAll({ vehicles: updatedVehicles, tripSheets: updatedTripSheets });
+    pushToGas('addTripSheet', ts);
     showToast(`Trip Sheet ${ts.tripNumber} (${ts.nopol}) berhasil diterbitkan!`);
   };
 
   const handleUpdateTripSheet = (ts: TripSheet) => {
-    const updated = tripSheets.map(item => (item.id === ts.id ? ts : item));
+    if (!ts?.id) return;
+    const targetId = String(ts.id).trim();
+    const updated = tripSheets.map(item => (String(item.id).trim() === targetId ? ts : item));
     setTripSheets(updated);
     saveStoredTripSheets(updated);
 
@@ -2158,12 +2173,15 @@ export function App() {
     );
 
     persistAll({ vehicles: updatedVehicles, tripSheets: updated });
+    pushToGas('updateTripSheet', ts);
     showToast(`Data Trip Sheet ${ts.tripNumber} berhasil diperbarui!`);
   };
 
   const handleDeleteTripSheet = (id: string) => {
-    const target = tripSheets.find(t => t.id === id);
-    const updated = tripSheets.filter(t => t.id !== id);
+    const targetId = String(id || '').trim();
+    if (!targetId) return;
+    const target = tripSheets.find(t => String(t.id).trim() === targetId);
+    const updated = tripSheets.filter(t => String(t.id).trim() !== targetId);
     setTripSheets(updated);
     saveStoredTripSheets(updated);
 
@@ -2171,15 +2189,16 @@ export function App() {
       'tripsheet',
       'delete',
       'Hapus Trip Sheet',
-      `Penghapusan trip sheet ${target?.tripNumber || id} unit ${target?.nopol || '-'}.`,
-      id,
-      target?.tripNumber || id,
+      `Penghapusan trip sheet ${target?.tripNumber || targetId} unit ${target?.nopol || '-'}.`,
+      targetId,
+      target?.tripNumber || targetId,
       undefined,
       'danger'
     );
 
     persistAll({ tripSheets: updated });
-    showToast('Trip Sheet berhasil dihapus', 'info');
+    pushToGas('deleteTripSheet', { id: targetId });
+    showToast(`Trip Sheet ${target?.tripNumber || targetId} berhasil dihapus`, 'info');
   };
 
   // --- Handlers: Arus Kas Peralatan & Perlengkapan Armada ---
@@ -2248,6 +2267,7 @@ export function App() {
       };
       updatedFinances = [linkedFinance, ...updatedFinances.filter(f => f.id !== linkedFinance.id)];
       setFinances(updatedFinances);
+      pushToGas('addFinance', linkedFinance);
     }
 
     createActivityLog(
@@ -2267,11 +2287,14 @@ export function App() {
       equipment: updatedEquipment,
       finances: updatedFinances
     });
+    pushToGas('addEquipmentFlow', eq);
     showToast(`Peralatan ${eq.equipmentName} (${formatRupiah(eq.totalAmount)}) berhasil dicatat & terintegrasi ke buku kas!`);
   };
 
   const handleUpdateEquipment = (eq: EquipmentCashFlow) => {
-    const updated = equipmentList.map(item => (item.id === eq.id ? eq : item));
+    if (!eq?.id) return;
+    const targetId = String(eq.id).trim();
+    const updated = equipmentList.map(item => (String(item.id).trim() === targetId ? eq : item));
     setEquipmentList(updated);
     saveStoredEquipment(updated);
 
@@ -2287,14 +2310,17 @@ export function App() {
     );
 
     persistAll({ equipment: updated });
+    pushToGas('updateEquipmentFlow', eq);
     showToast(`Data peralatan ${eq.equipmentName} diperbarui!`);
   };
 
   const handleDeleteEquipment = (id: string) => {
+    const targetId = String(id || '').trim();
+    if (!targetId) return;
     const safeAccounts = asArray<FinancialAccount>(accounts);
     const safeDeposits = asArray<CompanyDeposit>(companyDeposits);
-    const target = equipmentList.find(e => e.id === id);
-    const updated = equipmentList.filter(e => e.id !== id);
+    const target = equipmentList.find(e => String(e.id).trim() === targetId);
+    const updated = equipmentList.filter(e => String(e.id).trim() !== targetId);
     setEquipmentList(updated);
     saveStoredEquipment(updated);
 
@@ -2327,8 +2353,10 @@ export function App() {
       saveStoredCompanyDeposits(updatedCompanies);
     }
 
+    // Hanya hapus 1 transaksi kas yang ber-ID spesifik FIN-EQP-${targetId}
+    const linkedFinanceId = `FIN-EQP-${targetId}`;
     const updatedFinances = asArray<OperationalFinance>(finances).filter(
-      f => f.id !== `FIN-EQP-${id}` && !(target?.receiptNumber && f.receiptNumber === target.receiptNumber)
+      f => String(f.id).trim() !== linkedFinanceId
     );
     setFinances(updatedFinances);
 
@@ -2336,9 +2364,9 @@ export function App() {
       'equipment',
       'delete',
       'Hapus Belanja Peralatan',
-      `Penghapusan catatan belanja alat ${target?.equipmentName || id}.`,
-      id,
-      target?.equipmentName || id,
+      `Penghapusan catatan belanja alat ${target?.equipmentName || targetId}.`,
+      targetId,
+      target?.equipmentName || targetId,
       undefined,
       'danger'
     );
@@ -2349,7 +2377,9 @@ export function App() {
       equipment: updated,
       finances: updatedFinances
     });
-    showToast('Catatan peralatan dihapus & saldo dikembalikan', 'info');
+    pushToGas('deleteEquipmentFlow', { id: targetId });
+    pushToGas('deleteFinance', { id: linkedFinanceId });
+    showToast(`Catatan peralatan ${target?.equipmentName || targetId} dihapus & saldo dikembalikan`, 'info');
   };
 
   // --- Handlers: Arus Kas Saku Driver Untuk Perjalanan ---
@@ -2460,6 +2490,7 @@ export function App() {
       };
       updatedFinances = [linkedFinance, ...updatedFinances.filter(f => f.id !== linkedFinance.id)];
       setFinances(updatedFinances);
+      pushToGas('addFinance', linkedFinance);
     }
 
     let updatedTripSheets = asArray<TripSheet>(tripSheets);
@@ -2494,11 +2525,14 @@ export function App() {
       finances: updatedFinances,
       tripSheets: updatedTripSheets
     });
+    pushToGas('addPocketFlow', pf);
     showToast(`Uang saku ${pf.driverName} (${formatRupiah(pf.totalGiven)}) berhasil dicairkan & terintegrasi ke Buku Kas!`);
   };
 
   const handleUpdatePocketFlow = (pf: DriverPocketCashFlow) => {
-    const updated = asArray<DriverPocketCashFlow>(pocketFlows).map(item => (item.id === pf.id ? pf : item));
+    if (!pf?.id) return;
+    const targetId = String(pf.id).trim();
+    const updated = asArray<DriverPocketCashFlow>(pocketFlows).map(item => (String(item.id).trim() === targetId ? pf : item));
     setPocketFlows(updated);
     saveStoredPocketFlows(updated);
 
@@ -2514,15 +2548,18 @@ export function App() {
     );
 
     persistAll({ pocketFlows: updated });
+    pushToGas('updatePocketFlow', pf);
     showToast(`Data uang saku ${pf.tripCode} berhasil diperbarui!`);
   };
 
   const handleDeletePocketFlow = (id: string) => {
+    const targetId = String(id || '').trim();
+    if (!targetId) return;
     const safeAccounts = asArray<FinancialAccount>(accounts);
     const safeDeposits = asArray<CompanyDeposit>(companyDeposits);
     const safeFlows = asArray<DriverPocketCashFlow>(pocketFlows);
-    const target = safeFlows.find(p => p.id === id);
-    const updated = safeFlows.filter(p => p.id !== id);
+    const target = safeFlows.find(p => String(p.id).trim() === targetId);
+    const updated = safeFlows.filter(p => String(p.id).trim() !== targetId);
     setPocketFlows(updated);
     saveStoredPocketFlows(updated);
 
@@ -2586,8 +2623,10 @@ export function App() {
       }
     }
 
+    // Hanya hapus 1 transaksi kas yang ber-ID spesifik FIN-SAKU-${targetId}
+    const linkedFinanceId = `FIN-SAKU-${targetId}`;
     const updatedFinances = asArray<OperationalFinance>(finances).filter(
-      f => f.id !== `FIN-SAKU-${id}` && !(target?.tripCode && f.tripCode === target.tripCode)
+      f => String(f.id).trim() !== linkedFinanceId
     );
     setFinances(updatedFinances);
 
@@ -2595,9 +2634,9 @@ export function App() {
       'pocket_money',
       'delete',
       'Hapus Uang Saku Driver',
-      `Penghapusan catatan uang saku ${target?.tripCode || id} supir ${target?.driverName || '-'}.`,
-      id,
-      target?.tripCode || id,
+      `Penghapusan catatan uang saku ${target?.tripCode || targetId} supir ${target?.driverName || '-'}.`,
+      targetId,
+      target?.tripCode || targetId,
       undefined,
       'danger'
     );
@@ -2608,7 +2647,9 @@ export function App() {
       pocketFlows: updated,
       finances: updatedFinances
     });
-    showToast('Catatan uang saku dihapus & saldo dikembalikan.', 'info');
+    pushToGas('deletePocketFlow', { id: targetId });
+    pushToGas('deleteFinance', { id: linkedFinanceId });
+    showToast(`Catatan uang saku ${target?.tripCode || targetId} dihapus & saldo dikembalikan.`, 'info');
   };
 
   // --- Handlers: Maintenance ---
@@ -2790,11 +2831,14 @@ export function App() {
       'success'
     );
     persistAll({ sparepartInventory: updated });
+    pushToGas('addSparepart', item);
     showToast(`Sparepart ${item.partName} berhasil disimpan ke Gudang!`);
   };
 
   const handleUpdateSparepartItem = (item: SparepartInventoryItem) => {
-    const updated = sparepartInventory.map(p => (p.id === item.id ? item : p));
+    if (!item?.id) return;
+    const targetId = String(item.id).trim();
+    const updated = sparepartInventory.map(p => (String(p.id).trim() === targetId ? item : p));
     setSparepartInventory(updated);
     saveStoredSparepartInventory(updated);
     createActivityLog(
@@ -2808,31 +2852,35 @@ export function App() {
       'primary'
     );
     persistAll({ sparepartInventory: updated });
+    pushToGas('updateSparepart', item);
     showToast(`Data sparepart ${item.partCode} diperbarui!`);
   };
 
   const handleDeleteSparepartItem = (id: string) => {
-    const target = sparepartInventory.find(p => p.id === id);
-    const updated = sparepartInventory.filter(p => p.id !== id);
+    const targetId = String(id || '').trim();
+    if (!targetId) return;
+    const target = sparepartInventory.find(p => String(p.id).trim() === targetId);
+    const updated = sparepartInventory.filter(p => String(p.id).trim() !== targetId);
     setSparepartInventory(updated);
     saveStoredSparepartInventory(updated);
     createActivityLog(
       'sparepart_inventory',
       'delete',
       'Hapus Item Inventory Sparepart',
-      `Penghapusan item sparepart ${target?.partName || id} dari gudang.`,
-      id,
-      target?.partName || id,
+      `Penghapusan item sparepart ${target?.partName || targetId} dari gudang.`,
+      targetId,
+      target?.partName || targetId,
       undefined,
       'danger'
     );
     persistAll({ sparepartInventory: updated });
-    showToast(`Item sparepart ${target?.partCode || ''} dihapus.`, 'info');
+    pushToGas('deleteSparepart', { id: targetId });
+    showToast(`Item sparepart ${target?.partCode || targetId} dihapus.`, 'info');
   };
 
   const handleRecordSparepartMovement = (mov: SparepartStockMovement, updatedItem: SparepartInventoryItem) => {
     const updatedMovements = [mov, ...sparepartMovements];
-    const updatedInventory = sparepartInventory.map(p => (p.id === updatedItem.id ? updatedItem : p));
+    const updatedInventory = sparepartInventory.map(p => (String(p.id).trim() === String(updatedItem.id).trim() ? updatedItem : p));
     setSparepartMovements(updatedMovements);
     setSparepartInventory(updatedInventory);
     saveStoredSparepartMovements(updatedMovements);
@@ -2848,15 +2896,20 @@ export function App() {
       'info'
     );
     persistAll({ sparepartInventory: updatedInventory, sparepartMovements: updatedMovements });
+    pushToGas('addSparepartMovement', mov);
+    pushToGas('updateSparepart', updatedItem);
     showToast(`Mutasi stok ${mov.partName} berhasil dicatat! Sisa stok: ${updatedItem.stockQty} ${updatedItem.unit}`);
   };
 
   const handleDeleteSparepartMovement = (id: string) => {
-    const updated = sparepartMovements.filter(m => m.id !== id);
+    const targetId = String(id || '').trim();
+    if (!targetId) return;
+    const updated = sparepartMovements.filter(m => String(m.id).trim() !== targetId);
     setSparepartMovements(updated);
     saveStoredSparepartMovements(updated);
     persistAll({ sparepartMovements: updated });
-    showToast('Riwayat mutasi sparepart dihapus.', 'info');
+    pushToGas('deleteSparepartMovement', { id: targetId });
+    showToast('Riwayat mutasi sparepart yang dipilih berhasil dihapus.', 'info');
   };
 
   // --- Handlers: Users & Account Management ---
@@ -2875,15 +2928,18 @@ export function App() {
       'success'
     );
     persistAll({ users: updated });
+    pushToGas('addUser', usr);
     showToast(`Pengguna baru ${usr.name} (${usr.role.toUpperCase()}) berhasil dibuat!`);
   };
 
   const handleUpdateUserAccount = (usr: UserAccount) => {
+    if (!usr?.id) return;
+    const targetId = String(usr.id).trim();
     const normalizedUser: UserAccount = {
       ...usr,
       allowedTabs: normalizeAllowedModules(usr.allowedTabs, usr.role, true)
     };
-    const updated = users.map(u => (u.id === normalizedUser.id ? normalizedUser : u));
+    const updated = users.map(u => (String(u.id).trim() === targetId ? normalizedUser : u));
     setUsers(updated);
     saveStoredUserAccounts(updated);
 
@@ -2914,26 +2970,30 @@ export function App() {
       'primary'
     );
     persistAll({ users: updated });
+    pushToGas('updateUser', normalizedUser);
     showToast(`Profil & hak akses modul ${normalizedUser.name} berhasil diperbarui!`);
   };
 
   const handleDeleteUserAccount = (userId: string) => {
-    const target = users.find(u => u.id === userId);
-    const updated = users.filter(u => u.id !== userId);
+    const targetId = String(userId || '').trim();
+    if (!targetId) return;
+    const target = users.find(u => String(u.id).trim() === targetId);
+    const updated = users.filter(u => String(u.id).trim() !== targetId);
     setUsers(updated);
     saveStoredUserAccounts(updated);
     createActivityLog(
       'user',
       'delete',
       'Hapus Akun Pengguna',
-      `Penghapusan akun staf ${target?.name || userId} (${target?.role.toUpperCase() || '-'}).`,
-      userId,
-      target?.name || userId,
+      `Penghapusan akun staf ${target?.name || targetId} (${target?.role.toUpperCase() || '-'}).`,
+      targetId,
+      target?.name || targetId,
       undefined,
       'danger'
     );
     persistAll({ users: updated });
-    showToast(`Akun pengguna ${target?.name || ''} telah dihapus.`, 'info');
+    pushToGas('deleteUser', { id: targetId });
+    showToast(`Akun pengguna ${target?.name || targetId} telah dihapus.`, 'info');
   };
 
   const handleSwitchUser = (usr: UserAccount) => {
@@ -2975,11 +3035,15 @@ export function App() {
     showToast(`Masuk sebagai: ${usr.name} (${getRoleMeta(usr.role).title})`);
   };
 
-  // Activity Log Specific Handlers
-  const handleClearActivityLogs = () => {
-    clearStoredActivityLogs();
-    setActivityLogs([]);
-    showToast('Seluruh riwayat log aktivitas telah dibersihkan oleh Owner.', 'info');
+  // Activity Log Specific Handlers (Fokus Hapus 1 Log yang Dipilih Saja)
+  const handleDeleteActivityLog = (logId: string) => {
+    const targetId = String(logId || '').trim();
+    if (!targetId) return;
+    const updated = activityLogs.filter(l => String(l.id).trim() !== targetId);
+    setActivityLogs(updated);
+    saveStoredActivityLogs(updated);
+    pushToGas('deleteAuditLog', { id: targetId });
+    showToast(`Catatan log audit (${targetId}) berhasil dihapus.`, 'info');
   };
 
   const handleAddManualAuditLog = (logInput: Omit<ActivityLog, 'id' | 'timestamp'> & { timestamp?: string }) => {
@@ -3568,12 +3632,14 @@ export function App() {
                   />
                 )}
 
-                {currentTab === 'activity_log' && (
+                {(currentTab === 'activity_log' || currentTab === 'logs') && (
                   <ActivityLogManager
-                    logs={activityLogs}
-                    currentUserRole={userRole}
-                    onClearLogs={handleClearActivityLogs}
-                    onAddManualLog={handleAddManualAuditLog}
+                    activityLogs={activityLogs}
+                    userRole={userRole}
+                    currentUserId={currentUserId}
+                    users={users}
+                    onDeleteLog={handleDeleteActivityLog}
+                    onAddLog={handleAddManualAuditLog}
                     onOpenRoleMatrix={() => setIsRoleMatrixModalOpen(true)}
                   />
                 )}

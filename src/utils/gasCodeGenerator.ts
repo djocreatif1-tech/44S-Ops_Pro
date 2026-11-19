@@ -1,6 +1,6 @@
 // ============================================================================
-// 44S OPS_PRO ENTERPRISE - GOOGLE APPS SCRIPT GENERATOR (TANPA DATA DUMMY)
-// File 1: Kode.gs   (High-Speed Batch API, Auto-Purge Dummy Data, CacheService)
+// 44S OPS_PRO ENTERPRISE - GOOGLE APPS SCRIPT GENERATOR
+// File 1: Kode.gs   (Granular Single-Row Edit & Delete by ID, Non-Destructive Sync, CacheService)
 // File 2: Setup.gs  (Inisialisasi 16 Sheet Bersih Tanpa Dummy, Auto-Trim Hemat Sel DB)
 // File 3: Index.html (100% Identical Full React Web Application Bundle)
 // ============================================================================
@@ -11,12 +11,15 @@ export const GAS_KODE_GS = `/**
  * ============================================================================
  * 1. FILE: Kode.gs
  * 44S Ops_pro Enterprise - High-Performance Google Apps Script Backend
- * (DATABASE UTAMA BERSIH — TANPA DATA DUMMY & DILENGKAPI AUTO-PURGE DUMMY)
+ * (GRANULAR SINGLE-ROW CRUD — FOKUS PADA DATA YANG DIPILIH SAJA)
  * ============================================================================
- * Fitur Optimasi (Hemat Database & Anti-Lemot):
- * 1. Zero Dummy Data Policy: Tidak pernah membuat data dummy & otomatis menghapus
- *    baris dummy lama dari seluruh Sheet.
- * 2. Batch Read/Write (getValues & setValues): 100x lebih cepat dibanding appendRow.
+ * Prinsip Keamanan & Optimasi Database:
+ * 1. Granular Single-Record Edit & Delete:
+ *    - Edit (upsertSingleRecord): Hanya memperbarui 1 baris dengan ID yang dipilih.
+ *    - Delete (deleteRowById): Hanya menghapus 1 baris dengan ID yang dipilih.
+ *    - Tidak ada perintah hapus semua data (clearContent / mass purge).
+ * 2. Non-Destructive Batch Upsert: Sinkronisasi massal hanya memperbarui baris ID
+ *    yang cocok atau menambah baris baru tanpa pernah mengosongkan tabel.
  * 3. CacheService (In-Memory Cache 60 Detik): Respon < 80ms saat buka dari HP/PC.
  * 4. Payload Compression Guard: Mencegah Base64 foto/nota > 40KB membebani sel Sheet.
  * 5. Auto-Trim Empty Cells: Menghapus ribuan baris/kolom kosong agar hemat kuota 10 Juta sel.
@@ -24,7 +27,7 @@ export const GAS_KODE_GS = `/**
  */
 
 var APP_TITLE = '44S Ops_pro - Sistem Manajemen Terpadu Operasional Kendaraan & Rekening Kas';
-var CACHE_KEY_ALL_DATA = '44S_OPS_CLEAN_CACHE_V5';
+var CACHE_KEY_ALL_DATA = '44S_OPS_CLEAN_CACHE_V6';
 var CACHE_TTL_SECONDS = 60;
 
 var SHEETS = {
@@ -66,123 +69,6 @@ SHEET_SCHEMAS[SHEETS.USERS] = ['id', 'username', 'name', 'email', 'phone', 'role
 SHEET_SCHEMAS[SHEETS.AUDIT_LOGS] = ['id', 'timestamp', 'userName', 'userRole', 'module', 'action', 'title', 'rawJson'];
 
 /**
- * Daftar ID, Nama Perusahaan, & Nopol Dummy yang Wajib Dihapus dari Database Utama
- */
-var DUMMY_IDS_LIST = [
-  'DEP-001', 'DEP-002', 'DEP-003', 'DEP-004',
-  'ACC-BCA', 'ACC-MANDIRI', 'ACC-CASH', 'ACC-ETOLL', 'ACC-BRI-SINAR', 'ACC-BNI-MAJU',
-  'V-001', 'V-002', 'V-003', 'V-004', 'V-005', 'V-006',
-  'TAX-001', 'TAX-002', 'TAX-003', 'TAX-004', 'TAX-005', 'TAX-006',
-  'FL-001', 'FL-002', 'FL-003', 'FL-004', 'FL-005', 'FL-006',
-  'FIN-001', 'FIN-002', 'FIN-003', 'FIN-004', 'FIN-005', 'FIN-006', 'FIN-007', 'FIN-008', 'FIN-009', 'FIN-010',
-  'TS-001', 'TS-002', 'TS-003', 'TS-004',
-  'MNT-001', 'MNT-002', 'MNT-003',
-  'DRV-001', 'DRV-002', 'DRV-003', 'DRV-004', 'DRV-005', 'DRV-006', 'DRV-007', 'DRV-008', 'DRV-009', 'DRV-010',
-  'LOG-001', 'LOG-002', 'LOG-003', 'LOG-004', 'LOG-005', 'LOG-006', 'LOG-007', 'LOG-008', 'LOG-009', 'LOG-010',
-  'EQ-001', 'EQ-002', 'EQ-003', 'EQ-004', 'EQ-005', 'EQ-006',
-  'SAKU-001', 'SAKU-002', 'SAKU-003', 'SAKU-004',
-  'SUP-001', 'SUP-002', 'SUP-003', 'SUP-004', 'SUP-005', 'SUP-006',
-  'ADM-001', 'ADM-002', 'ADM-003', 'ADM-004', 'ADM-005',
-  'TOP-202608-01', 'TOP-202608-02', 'TOP-202608-03', 'TOP-202608-04',
-  'REQ-DEP-202608-01', 'REQ-DEP-202608-02', 'REQ-DEP-202608-03', 'REQ-DEP-202608-04', 'REQ-DEP-202608-05', 'REQ-DEP-202608-06',
-  'INV-SP-001', 'INV-SP-002', 'INV-SP-003', 'INV-SP-004', 'INV-SP-005', 'INV-SP-006',
-  'INV-SP-007', 'INV-SP-008', 'INV-SP-009', 'INV-SP-010', 'INV-SP-011', 'INV-SP-012',
-  'MOV-SP-001', 'MOV-SP-002', 'MOV-SP-003', 'MOV-SP-004', 'MOV-SP-005'
-];
-
-var DUMMY_COMPANIES_LIST = [
-  'PT Sumber Makmur Mineral',
-  'PT Antar Lintas Logistik Nusantara',
-  'CV Berkah Perkasa Abadi',
-  'PT Cipta Bangun Konstruksi',
-  'PT Sinar Surya Persada',
-  'PT Krakatau Logistik Nusantara'
-];
-
-var DUMMY_PLATES_LIST = [
-  'B 9482 TDE', 'B 9104 KQA', 'B 9812 UXA', 'B 9231 KJD', 'B 9550 TLA', 'B 9773 UWB'
-];
-
-function isDummyObject(obj) {
-  if (!obj || typeof obj !== 'object') return false;
-  var idStr = String(obj.id || '');
-  if (idStr && DUMMY_IDS_LIST.indexOf(idStr) !== -1) return true;
-  var compStr = String(obj.companyName || '');
-  if (compStr && DUMMY_COMPANIES_LIST.indexOf(compStr) !== -1) return true;
-  var plateStr = String(obj.nopol || obj.plateNumber || '');
-  if (plateStr && DUMMY_PLATES_LIST.indexOf(plateStr) !== -1) return true;
-  return false;
-}
-
-/**
- * Menghapus seluruh baris data dummy dari Google Spreadsheet tanpa menyentuh data riil pengguna
- */
-function purgeDummyDataFromSpreadsheet(ss) {
-  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
-  var removedCount = 0;
-
-  for (var key in SHEETS) {
-    var sheetName = SHEETS[key];
-    if (sheetName === SHEETS.USERS || sheetName === SHEETS.MASTER_REF) continue;
-    var sheet = ss.getSheetByName(sheetName);
-    if (!sheet || sheet.getLastRow() <= 1) continue;
-
-    var lastRow = sheet.getLastRow();
-    var lastCol = sheet.getLastColumn();
-    var values = sheet.getRange(1, 1, lastRow, lastCol).getValues();
-    var headers = values[0];
-    var cleanRows = [];
-    var sheetRemoved = 0;
-
-    for (var i = 1; i < values.length; i++) {
-      var row = values[i];
-      var rowId = String(row[0] || '');
-      if (!rowId) continue;
-
-      var isDummy = (DUMMY_IDS_LIST.indexOf(rowId) !== -1);
-      if (!isDummy) {
-        for (var c = 0; c < row.length; c++) {
-          var cellStr = String(row[c] || '');
-          if (DUMMY_COMPANIES_LIST.indexOf(cellStr) !== -1 || DUMMY_PLATES_LIST.indexOf(cellStr) !== -1) {
-            isDummy = true;
-            break;
-          }
-          for (var dIdx = 0; dIdx < DUMMY_COMPANIES_LIST.length; dIdx++) {
-            if (cellStr.indexOf(DUMMY_COMPANIES_LIST[dIdx]) !== -1) {
-              isDummy = true;
-              break;
-            }
-          }
-          if (isDummy) break;
-        }
-      }
-
-      if (isDummy) {
-        sheetRemoved++;
-        removedCount++;
-      } else {
-        cleanRows.push(row);
-      }
-    }
-
-    if (sheetRemoved > 0) {
-      sheet.getRange(2, 1, lastRow - 1, lastCol).clearContent();
-      if (cleanRows.length > 0) {
-        sheet.getRange(2, 1, cleanRows.length, lastCol).setValues(cleanRows);
-      }
-      compactSheetCells(sheet, Math.max(cleanRows.length + 5, 10), headers.length);
-    }
-  }
-
-  invalidateFastCache();
-  return {
-    status: 'success',
-    removedDummyRows: removedCount,
-    message: 'Database utama Spreadsheet bersih dari data dummy (' + removedCount + ' baris dummy dihapus).'
-  };
-}
-
-/**
  * 1. HTTP GET HANDLER
  */
 function doGet(e) {
@@ -193,14 +79,10 @@ function doGet(e) {
     return createJsonResponse(getAllSpreadsheetDataFast(forceRefresh));
   }
 
-  if (params.action === 'purgeDummyData') {
-    return createJsonResponse(purgeDummyDataFromSpreadsheet());
-  }
-
   if (params.action === 'ping') {
     return createJsonResponse({
       status: 'success',
-      message: '44S Ops_pro Fast Cloud Engine Ready (Zero Dummy Data)',
+      message: '44S Ops_pro Fast Cloud Engine Ready (Granular Single-Record CRUD)',
       timestamp: new Date().toISOString()
     });
   }
@@ -255,7 +137,7 @@ function runClientApi(payload) {
 }
 
 /**
- * Router Aksi Backend
+ * Router Aksi Backend (Fokus Pada Item yang Dipilih Saja)
  */
 function processApiAction(payload) {
   var action = payload.action;
@@ -267,58 +149,53 @@ function processApiAction(payload) {
       return setupDatabase();
     }
     ensureAllSheetsReady(ss);
-    purgeDummyDataFromSpreadsheet(ss);
-    return { status: 'success', message: '16 Tabel Database berhasil diinisialisasi & dibersihkan dari data dummy.' };
-  }
-
-  if (action === 'purgeDummyData') {
-    return purgeDummyDataFromSpreadsheet(ss);
+    return { status: 'success', message: '16 Tabel Database siap digunakan.' };
   }
 
   if (action === 'optimizeDatabase') {
-    purgeDummyDataFromSpreadsheet(ss);
     if (typeof optimizeAllDatabaseSheets === 'function') {
       var res = optimizeAllDatabaseSheets();
       invalidateFastCache();
       return res;
     }
-    return { status: 'success', message: 'Optimasi & pembersihan data dummy selesai.' };
+    return { status: 'success', message: 'Optimasi sel kosong selesai.' };
   }
 
-  // BULK SYNC CEPAT (Otomatis menyaring agar tidak pernah menulis data dummy ke Spreadsheet)
+  // NON-DESTRUCTIVE BATCH UPSERT (Hanya menambah/memperbarui per ID, tidak pernah menghapus/mengosongkan tabel)
   if (action === 'bulkSync' || action === 'syncAll') {
     ensureAllSheetsReady(ss);
     var data = itemData || {};
 
-    if (Array.isArray(data.vehicles)) batchWriteSheet(ss, SHEETS.VEHICLES, data.vehicles);
-    if (Array.isArray(data.taxes)) batchWriteSheet(ss, SHEETS.TAXES, data.taxes);
-    if (Array.isArray(data.fuelLogs)) batchWriteSheet(ss, SHEETS.FUEL, data.fuelLogs);
-    if (Array.isArray(data.finances)) batchWriteSheet(ss, SHEETS.FINANCE, data.finances);
-    if (Array.isArray(data.pocketFlows)) batchWriteSheet(ss, SHEETS.POCKET_FLOWS, data.pocketFlows);
+    if (Array.isArray(data.vehicles)) batchUpsertSheet(ss, SHEETS.VEHICLES, data.vehicles);
+    if (Array.isArray(data.taxes)) batchUpsertSheet(ss, SHEETS.TAXES, data.taxes);
+    if (Array.isArray(data.fuelLogs)) batchUpsertSheet(ss, SHEETS.FUEL, data.fuelLogs);
+    if (Array.isArray(data.finances)) batchUpsertSheet(ss, SHEETS.FINANCE, data.finances);
+    if (Array.isArray(data.pocketFlows)) batchUpsertSheet(ss, SHEETS.POCKET_FLOWS, data.pocketFlows);
     if (Array.isArray(data.equipmentFlows || data.equipmentList)) {
-      batchWriteSheet(ss, SHEETS.EQUIPMENT_FLOWS, data.equipmentFlows || data.equipmentList);
+      batchUpsertSheet(ss, SHEETS.EQUIPMENT_FLOWS, data.equipmentFlows || data.equipmentList);
     }
-    if (Array.isArray(data.tripSheets)) batchWriteSheet(ss, SHEETS.TRIP_SHEETS, data.tripSheets);
-    if (Array.isArray(data.timesheets)) batchWriteSheet(ss, SHEETS.TIMESHEETS, data.timesheets);
-    if (Array.isArray(data.maintenance)) batchWriteSheet(ss, SHEETS.MAINTENANCE, data.maintenance);
-    if (Array.isArray(data.sparepartInventory)) batchWriteSheet(ss, SHEETS.SPAREPARTS, data.sparepartInventory);
-    if (Array.isArray(data.sparepartMovements)) batchWriteSheet(ss, SHEETS.SPAREPART_MOVEMENTS, data.sparepartMovements);
-    if (Array.isArray(data.drivers)) batchWriteSheet(ss, SHEETS.DRIVERS, data.drivers);
-    if (Array.isArray(data.accounts)) batchWriteSheet(ss, SHEETS.ACCOUNTS, data.accounts);
-    if (Array.isArray(data.companyDeposits)) batchWriteSheet(ss, SHEETS.COMPANY_DEPOSITS, data.companyDeposits);
-    if (Array.isArray(data.users)) batchWriteSheet(ss, SHEETS.USERS, data.users);
+    if (Array.isArray(data.tripSheets)) batchUpsertSheet(ss, SHEETS.TRIP_SHEETS, data.tripSheets);
+    if (Array.isArray(data.timesheets)) batchUpsertSheet(ss, SHEETS.TIMESHEETS, data.timesheets);
+    if (Array.isArray(data.maintenance)) batchUpsertSheet(ss, SHEETS.MAINTENANCE, data.maintenance);
+    if (Array.isArray(data.sparepartInventory)) batchUpsertSheet(ss, SHEETS.SPAREPARTS, data.sparepartInventory);
+    if (Array.isArray(data.sparepartMovements)) batchUpsertSheet(ss, SHEETS.SPAREPART_MOVEMENTS, data.sparepartMovements);
+    if (Array.isArray(data.drivers)) batchUpsertSheet(ss, SHEETS.DRIVERS, data.drivers);
+    if (Array.isArray(data.accounts)) batchUpsertSheet(ss, SHEETS.ACCOUNTS, data.accounts);
+    if (Array.isArray(data.companyDeposits)) batchUpsertSheet(ss, SHEETS.COMPANY_DEPOSITS, data.companyDeposits);
+    if (Array.isArray(data.users)) batchUpsertSheet(ss, SHEETS.USERS, data.users);
     if (Array.isArray(data.auditLogs)) {
-      batchWriteSheet(ss, SHEETS.AUDIT_LOGS, data.auditLogs.slice(0, 250));
+      batchUpsertSheet(ss, SHEETS.AUDIT_LOGS, data.auditLogs.slice(0, 250));
     }
 
     invalidateFastCache();
     return {
       status: 'success',
-      message: 'Sinkronisasi Batch 16 Modul selesai (Bebas Data Dummy & Hemat Sel)',
+      message: 'Sinkronisasi Non-Destructive 16 Modul selesai (Data Aman & Hemat Sel)',
       timestamp: new Date().toISOString()
     };
   }
 
+  // GRANULAR SINGLE-RECORD CRUD MAP (Fokus hanya pada 1 ID data yang dipilih)
   var granularMap = {
     addVehicle: { sheet: SHEETS.VEHICLES, mode: 'upsert' },
     updateVehicle: { sheet: SHEETS.VEHICLES, mode: 'upsert' },
@@ -347,22 +224,54 @@ function processApiAction(payload) {
     addMaintenance: { sheet: SHEETS.MAINTENANCE, mode: 'upsert' },
     updateMaintenance: { sheet: SHEETS.MAINTENANCE, mode: 'upsert' },
     deleteMaintenance: { sheet: SHEETS.MAINTENANCE, mode: 'delete' },
+    addSparepart: { sheet: SHEETS.SPAREPARTS, mode: 'upsert' },
+    updateSparepart: { sheet: SHEETS.SPAREPARTS, mode: 'upsert' },
+    deleteSparepart: { sheet: SHEETS.SPAREPARTS, mode: 'delete' },
+    addSparepartMovement: { sheet: SHEETS.SPAREPART_MOVEMENTS, mode: 'upsert' },
+    updateSparepartMovement: { sheet: SHEETS.SPAREPART_MOVEMENTS, mode: 'upsert' },
+    deleteSparepartMovement: { sheet: SHEETS.SPAREPART_MOVEMENTS, mode: 'delete' },
     addDriver: { sheet: SHEETS.DRIVERS, mode: 'upsert' },
     updateDriver: { sheet: SHEETS.DRIVERS, mode: 'upsert' },
     deleteDriver: { sheet: SHEETS.DRIVERS, mode: 'delete' },
     addAccount: { sheet: SHEETS.ACCOUNTS, mode: 'upsert' },
     updateAccount: { sheet: SHEETS.ACCOUNTS, mode: 'upsert' },
-    deleteAccount: { sheet: SHEETS.ACCOUNTS, mode: 'delete' }
+    deleteAccount: { sheet: SHEETS.ACCOUNTS, mode: 'delete' },
+    addCompanyDeposit: { sheet: SHEETS.COMPANY_DEPOSITS, mode: 'upsert' },
+    updateCompanyDeposit: { sheet: SHEETS.COMPANY_DEPOSITS, mode: 'upsert' },
+    deleteCompanyDeposit: { sheet: SHEETS.COMPANY_DEPOSITS, mode: 'delete' },
+    addUser: { sheet: SHEETS.USERS, mode: 'upsert' },
+    updateUser: { sheet: SHEETS.USERS, mode: 'upsert' },
+    deleteUser: { sheet: SHEETS.USERS, mode: 'delete' },
+    addAuditLog: { sheet: SHEETS.AUDIT_LOGS, mode: 'upsert' },
+    deleteAuditLog: { sheet: SHEETS.AUDIT_LOGS, mode: 'delete' }
   };
 
   if (granularMap[action]) {
     var target = granularMap[action];
     if (target.mode === 'upsert') {
-      upsertSingleRecord(ss, target.sheet, itemData);
+      var upRes = upsertSingleRecord(ss, target.sheet, itemData);
+      invalidateFastCache();
+      return { status: 'success', action: action, result: upRes };
     } else if (target.mode === 'delete') {
-      var delId = (itemData && itemData.id) ? itemData.id : itemData;
-      deleteRowById(ss, target.sheet, delId);
+      var delId = (itemData && typeof itemData === 'object' && itemData.id) ? itemData.id : itemData;
+      var delRes = deleteRowById(ss, target.sheet, delId);
+      invalidateFastCache();
+      return { status: 'success', action: action, result: delRes };
     }
+  }
+
+  if (action === 'payTax' && itemData) {
+    if (itemData.updatedTax) upsertSingleRecord(ss, SHEETS.TAXES, itemData.updatedTax);
+    if (itemData.newFinance) upsertSingleRecord(ss, SHEETS.FINANCE, itemData.newFinance);
+    if (itemData.updatedAccount) upsertSingleRecord(ss, SHEETS.ACCOUNTS, itemData.updatedAccount);
+    invalidateFastCache();
+    return { status: 'success', action: action };
+  }
+
+  if (action === 'topUpCompanyDeposit' && itemData) {
+    if (itemData.updatedDeposit) upsertSingleRecord(ss, SHEETS.COMPANY_DEPOSITS, itemData.updatedDeposit);
+    if (itemData.topUpTx) upsertSingleRecord(ss, SHEETS.FINANCE, itemData.topUpTx);
+    if (itemData.updatedAccount) upsertSingleRecord(ss, SHEETS.ACCOUNTS, itemData.updatedAccount);
     invalidateFastCache();
     return { status: 'success', action: action };
   }
@@ -370,17 +279,18 @@ function processApiAction(payload) {
   if (action === 'upsertRecord') {
     var sheetName = resolveSheetName(payload.module);
     if (!sheetName) return { status: 'error', message: 'Modul tidak dikenali: ' + payload.module };
-    upsertSingleRecord(ss, sheetName, payload.record || itemData);
+    var resUp = upsertSingleRecord(ss, sheetName, payload.record || itemData);
     invalidateFastCache();
-    return { status: 'success', module: payload.module };
+    return { status: 'success', module: payload.module, result: resUp };
   }
 
   if (action === 'deleteRecord') {
     var delSheetName = resolveSheetName(payload.module);
     if (!delSheetName) return { status: 'error', message: 'Modul tidak dikenali: ' + payload.module };
-    deleteRowById(ss, delSheetName, payload.id || (itemData && itemData.id));
+    var targetDelId = payload.id || (itemData && itemData.id) || itemData;
+    var resDel = deleteRowById(ss, delSheetName, targetDelId);
     invalidateFastCache();
-    return { status: 'success', module: payload.module };
+    return { status: 'success', module: payload.module, result: resDel };
   }
 
   if (action === 'triggerAlarmEmail') {
@@ -406,8 +316,6 @@ function getAllSpreadsheetDataFast(forceRefresh) {
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   ensureAllSheetsReady(ss);
-  // Pastikan baris data dummy yang pernah masuk dihapus otomatis
-  purgeDummyDataFromSpreadsheet(ss);
 
   var responsePayload = {
     status: 'success',
@@ -461,7 +369,6 @@ function readSheetFast(ss, sheetName) {
   var headers = values[0];
   var rawJsonIdx = headers.indexOf('rawJson');
   var results = [];
-  var isUserSheet = (sheetName === SHEETS.USERS);
 
   for (var i = 1; i < values.length; i++) {
     var row = values[i];
@@ -471,7 +378,6 @@ function readSheetFast(ss, sheetName) {
       try {
         var parsedObj = JSON.parse(String(row[rawJsonIdx]));
         if (parsedObj && typeof parsedObj === 'object') {
-          if (!isUserSheet && isDummyObject(parsedObj)) continue;
           results.push(parsedObj);
           continue;
         }
@@ -491,44 +397,32 @@ function readSheetFast(ss, sheetName) {
     }
     if (obj.plateNumber && !obj.nopol) obj.nopol = obj.plateNumber;
     if (obj.fullName && !obj.name) obj.name = obj.fullName;
-    if (!isUserSheet && isDummyObject(obj)) continue;
     results.push(obj);
   }
   return results;
 }
 
-function batchWriteSheet(ss, sheetName, records) {
-  if (!Array.isArray(records)) return;
-  var headers = SHEET_SCHEMAS[sheetName] || ['id', 'rawJson'];
-  var sheet = getOrCreateSheetWithSchema(ss, sheetName, headers);
-  var isUserSheet = (sheetName === SHEETS.USERS);
-
-  var filtered = [];
-  for (var r = 0; r < records.length; r++) {
-    if (!isUserSheet && isDummyObject(records[r])) continue;
-    filtered.push(records[r]);
-  }
-
-  var lastRow = sheet.getLastRow();
-  if (lastRow > 1) {
-    sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).clearContent();
-  }
-
-  if (filtered.length > 0) {
-    var matrix = [];
-    for (var i = 0; i < filtered.length; i++) {
-      var rec = sanitizeRecordForDatabase(filtered[i]);
-      matrix.push(mapRecordToRow(rec, headers));
+/**
+ * Non-Destructive Batch Upsert (Tidak pernah melakukan clearContent / hapus seluruh tabel)
+ * Hanya memperbarui baris yang memiliki ID sama atau menambahkan baris baru.
+ */
+function batchUpsertSheet(ss, sheetName, records) {
+  if (!Array.isArray(records) || records.length === 0) return;
+  for (var i = 0; i < records.length; i++) {
+    if (records[i] && records[i].id) {
+      upsertSingleRecord(ss, sheetName, records[i]);
     }
-    sheet.getRange(2, 1, matrix.length, headers.length).setValues(matrix);
   }
-
-  compactSheetCells(sheet, Math.max(filtered.length + 5, 10), headers.length);
 }
 
+/**
+ * Fokus Edit / Tambah 1 Data Terpilih Saja Berdasarkan ID Unik
+ */
 function upsertSingleRecord(ss, sheetName, record) {
-  if (!record || !record.id) return;
-  if (sheetName !== SHEETS.USERS && isDummyObject(record)) return;
+  if (!record || typeof record !== 'object') return { updated: false, reason: 'Data kosong' };
+  var targetId = String(record.id || '').trim();
+  if (!targetId) return { updated: false, reason: 'ID data kosong' };
+
   var headers = SHEET_SCHEMAS[sheetName] || ['id', 'rawJson'];
   var sheet = getOrCreateSheetWithSchema(ss, sheetName, headers);
   var cleanRec = sanitizeRecordForDatabase(record);
@@ -538,26 +432,34 @@ function upsertSingleRecord(ss, sheetName, record) {
   if (lastRow > 1) {
     var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
     for (var i = 0; i < ids.length; i++) {
-      if (String(ids[i][0]) === String(cleanRec.id)) {
+      if (String(ids[i][0] || '').trim() === targetId) {
         sheet.getRange(i + 2, 1, 1, headers.length).setValues([rowValues]);
-        return;
+        return { updated: true, mode: 'edit_single_row', id: targetId, row: i + 2 };
       }
     }
   }
   sheet.getRange(lastRow + 1, 1, 1, headers.length).setValues([rowValues]);
+  return { updated: true, mode: 'insert_single_row', id: targetId, row: lastRow + 1 };
 }
 
+/**
+ * Fokus Hapus 1 Data Terpilih Saja Berdasarkan ID Unik (Tidak menyentuh baris lain)
+ */
 function deleteRowById(ss, sheetName, id) {
+  var targetId = String(id || '').trim();
+  if (!targetId) return { deleted: false, reason: 'ID tidak valid' };
   var sheet = ss.getSheetByName(sheetName);
-  if (!sheet || sheet.getLastRow() <= 1) return;
+  if (!sheet || sheet.getLastRow() <= 1) return { deleted: false, reason: 'Sheet belum memiliki data' };
+
   var lastRow = sheet.getLastRow();
   var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-  for (var i = ids.length - 1; i >= 0; i--) {
-    if (String(ids[i][0]) === String(id)) {
+  for (var i = 0; i < ids.length; i++) {
+    if (String(ids[i][0] || '').trim() === targetId) {
       sheet.deleteRow(i + 2);
-      return;
+      return { deleted: true, mode: 'delete_single_row', id: targetId, row: i + 2 };
     }
   }
+  return { deleted: false, id: targetId, reason: 'ID tidak ditemukan' };
 }
 
 function sanitizeRecordForDatabase(record) {
@@ -701,15 +603,14 @@ function createJsonResponse(data) {
 export const GAS_SETUP_GS = `/**
  * ============================================================================
  * 2. FILE: Setup.gs
- * 44S Ops_pro Enterprise - Database Initializer, Dummy Data Purger & Optimizer
- * (TANPA PEMBUATAN DATA DUMMY — DATABASE UTAMA BERSIH 100%)
+ * 44S Ops_pro Enterprise - Database Initializer & Cell Quota Optimizer
+ * (AMAN DATA RIIL — TANPA PERINTAH HAPUS SEMUA DATA)
  * ============================================================================
  * Fungsi Utama Setup.gs:
- * 1. setupDatabase()                : Membuat 16 Sheet bersih & otomatis menghapus data dummy lama.
- * 2. purgeDummyDataMenuAction()     : Menghapus seluruh baris data dummy dari Google Spreadsheet.
- * 3. optimizeAllDatabaseSheets()    : Memangkas ribuan baris/kolom kosong (Hemat Kuota 10 Juta Sel).
- * 4. getDatabaseHealthReport()      : Mengukur pemakaian sel database & performa anti-lemot.
- * 5. setupDailyTrigger()            : Mengaktifkan cron job harian (jam 07:00 WIB) untuk kompresi DB & alarm pajak.
+ * 1. setupDatabase()                : Menyiapkan struktur 16 Sheet tanpa menghapus data yang sudah ada.
+ * 2. optimizeAllDatabaseSheets()    : Memangkas baris/kolom kosong di bawah data terakhir (Hemat Kuota 10 Juta Sel).
+ * 3. getDatabaseHealthReport()      : Mengukur pemakaian sel database & performa anti-lemot.
+ * 4. setupDailyTrigger()            : Mengaktifkan cron job harian (jam 07:00 WIB) untuk kompresi sel kosong & alarm pajak.
  * ============================================================================
  */
 
@@ -717,18 +618,17 @@ function onOpen() {
   try {
     var ui = SpreadsheetApp.getUi();
     ui.createMenu('🚛 44S Ops_pro Admin')
-      .addItem('1. Inisialisasi 16 Sheet Database (Bersih Tanpa Dummy)', 'setupDatabase')
-      .addItem('2. Hapus Seluruh Data Dummy dari Spreadsheet', 'purgeDummyDataMenuAction')
-      .addItem('3. Optimasi & Hemat Sel Database (Anti-Lemot)', 'optimizeAllDatabaseSheets')
+      .addItem('1. Inisialisasi Struktur 16 Sheet Database (Aman Data)', 'setupDatabase')
+      .addItem('2. Optimasi & Pangkas Sel Kosong (Anti-Lemot)', 'optimizeAllDatabaseSheets')
       .addSeparator()
-      .addItem('4. Cek Kesehatan & Kuota Sel Database', 'showDatabaseHealthDialog')
-      .addItem('5. Aktifkan Trigger Optimasi & Alarm Harian', 'setupDailyTrigger')
+      .addItem('3. Cek Kesehatan & Kuota Sel Database', 'showDatabaseHealthDialog')
+      .addItem('4. Aktifkan Trigger Optimasi & Alarm Harian', 'setupDailyTrigger')
       .addToUi();
   } catch (ignore) {}
 }
 
 /**
- * 1. INISIALISASI 16 SHEET BERSIH & HAPUS DATA DUMMY LAMA
+ * 1. INISIALISASI STRUKTUR 16 SHEET (TANPA MENGHAPUS DATA YANG SUDAH ADA)
  */
 function setupDatabase() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -737,9 +637,6 @@ function setupDatabase() {
   getOrCreateSheetWithSchema(ss, SHEETS.MASTER_REF, [
     'refType', 'code', 'name', 'companyName', 'status', 'updatedAt'
   ]);
-
-  // Otomatis bersihkan semua baris data dummy jika pernah terbuat sebelumnya
-  var purgeRes = purgeDummyDataFromSpreadsheet(ss);
 
   for (var key in SHEETS) {
     var sheetName = SHEETS[key];
@@ -766,31 +663,16 @@ function setupDatabase() {
   invalidateFastCache();
   return {
     status: 'success',
-    removedDummyRows: purgeRes.removedDummyRows,
-    message: '16 Sheet Database 44S Ops_pro siap & bersih tanpa data dummy (' + purgeRes.removedDummyRows + ' baris dummy dihapus).',
+    message: '16 Sheet Database 44S Ops_pro siap digunakan (Data yang ada tetap aman).',
     health: getDatabaseHealthReport()
   };
 }
 
 /**
- * 2. HAPUS DATA DUMMY VIA MENU SPREADSHEET
- */
-function purgeDummyDataMenuAction() {
-  var res = purgeDummyDataFromSpreadsheet(SpreadsheetApp.getActiveSpreadsheet());
-  try {
-    SpreadsheetApp.getUi().alert('🧹 Pembersihan Data Dummy Selesai', res.message, SpreadsheetApp.getUi().ButtonSet.OK);
-  } catch (ignore) {
-    Logger.log(res.message);
-  }
-  return res;
-}
-
-/**
- * 3. OPTIMASI & PENGHEMATAN SEL DATABASE (ANTI-LEMOT)
+ * 2. OPTIMASI & PENGHEMATAN SEL KOSONG DATABASE (ANTI-LEMOT)
  */
 function optimizeAllDatabaseSheets() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  purgeDummyDataFromSpreadsheet(ss);
   var sheets = ss.getSheets();
   var trimmedRowsTotal = 0;
   var trimmedColsTotal = 0;
@@ -814,12 +696,6 @@ function optimizeAllDatabaseSheets() {
       sheet.deleteColumns(lastC + 1, delC);
       trimmedColsTotal += delC;
     }
-  }
-
-  var auditSheet = ss.getSheetByName(SHEETS.AUDIT_LOGS);
-  if (auditSheet && auditSheet.getLastRow() > 255) {
-    var excess = auditSheet.getLastRow() - 251;
-    auditSheet.deleteRows(2, excess);
   }
 
   invalidateFastCache();
@@ -861,7 +737,7 @@ function getDatabaseHealthReport() {
     totalCellsAllocated: totalCellsAllocated,
     quotaLimit: maxQuota,
     usagePercent: usagePercent + '%',
-    performanceStatus: totalCellsAllocated < 250000 ? 'SANGAT CEPAT (ULTRA-LIGHT & ZERO DUMMY)' : 'OPTIMAL',
+    performanceStatus: totalCellsAllocated < 250000 ? 'SANGAT CEPAT (GRANULAR SINGLE-ROW CRUD)' : 'OPTIMAL',
     sheets: sheetStats
   };
 }
@@ -894,7 +770,7 @@ function setupDailyTrigger() {
     .everyDays(1)
     .create();
 
-  return { status: 'success', message: 'Trigger Harian (07:00 WIB) untuk Optimasi Database & Alarm Pajak aktif.' };
+  return { status: 'success', message: 'Trigger Harian (07:00 WIB) untuk Optimasi Sel Kosong & Alarm Pajak aktif.' };
 }
 
 function dailyMaintenanceAndAlarmJob() {

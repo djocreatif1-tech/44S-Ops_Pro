@@ -102,7 +102,7 @@ export function classifyCrudMessage(
   if (lower.includes('dihapus') || lower.includes('hapus') || lower.includes('dibersihkan')) {
     return {
       category: 'delete',
-      badgeText: 'CRUD • HAPUS DATA BERHASIL',
+      badgeText: 'Data Berhasil',
       title: 'Data Berhasil Dihapus'
     };
   }
@@ -117,7 +117,7 @@ export function classifyCrudMessage(
   ) {
     return {
       category: 'update',
-      badgeText: 'CRUD • UPDATE DATA BERHASIL',
+      badgeText: 'Data Berhasil',
       title: 'Data Berhasil Diperbarui'
     };
   }
@@ -134,7 +134,7 @@ export function classifyCrudMessage(
   ) {
     return {
       category: 'create',
-      badgeText: 'CRUD • SIMPAN DATA BERHASIL',
+      badgeText: 'Data Berhasil',
       title: 'Data Berhasil Disimpan'
     };
   }
@@ -142,15 +142,15 @@ export function classifyCrudMessage(
   if (baseType === 'info' || lower.includes('sinkronisasi') || lower.includes('peran aktif')) {
     return {
       category: 'info',
-      badgeText: 'SISTEM & SINKRONISASI',
+      badgeText: 'Informasi Sistem',
       title: 'Informasi Sistem'
     };
   }
 
   return {
     category: 'success',
-    badgeText: 'OPERASI BERHASIL',
-    title: 'Proses Berhasil'
+    badgeText: 'Data Berhasil',
+    title: 'Data Berhasil'
   };
 }
 

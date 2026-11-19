@@ -46,6 +46,7 @@ import {
 import { formatDateIndo, formatRupiah } from '../../utils/formatters';
 import { exportActivityLogsToExcel, exportActivityLogsToPDF } from '../../utils/exportUtils';
 import { getRolePermissions, getRoleMeta } from '../../utils/permissions';
+import { confirmDelete } from '../../utils/dialogService';
 
 interface ActivityLogManagerProps {
   activityLogs: ActivityLog[];
@@ -53,7 +54,7 @@ interface ActivityLogManagerProps {
   currentUserId?: string;
   users: UserAccount[];
   onAddLog: (log: Omit<ActivityLog, 'id' | 'timestamp'> & { timestamp?: string }) => void;
-  onClearLogs?: () => void;
+  onDeleteLog?: (id: string) => void;
   onOpenRoleMatrix?: () => void;
 }
 
@@ -63,7 +64,7 @@ export const ActivityLogManager: React.FC<ActivityLogManagerProps> = ({
   currentUserId,
   users = [],
   onAddLog,
-  onClearLogs,
+  onDeleteLog,
   onOpenRoleMatrix
 }) => {
   const safeLogs = Array.isArray(activityLogs) ? activityLogs : [];
@@ -85,8 +86,6 @@ export const ActivityLogManager: React.FC<ActivityLogManagerProps> = ({
   // Modals
   const [selectedLogDetail, setSelectedLogDetail] = useState<ActivityLog | null>(null);
   const [isAddNoteModalOpen, setIsAddNoteModalOpen] = useState<boolean>(false);
-  const [isClearConfirmOpen, setIsClearConfirmOpen] = useState<boolean>(false);
-  const [clearConfirmText, setClearConfirmText] = useState<string>('');
 
   // Manual Log Note Form State
   const [manualNoteData, setManualNoteData] = useState({
@@ -285,15 +284,6 @@ export const ActivityLogManager: React.FC<ActivityLogManagerProps> = ({
     setIsAddNoteModalOpen(false);
   };
 
-  const handleConfirmClearLogs = () => {
-    if (clearConfirmText.trim().toLowerCase() !== 'hapus log') return;
-    if (onClearLogs) {
-      onClearLogs();
-    }
-    setIsClearConfirmOpen(false);
-    setClearConfirmText('');
-  };
-
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -349,18 +339,6 @@ export const ActivityLogManager: React.FC<ActivityLogManagerProps> = ({
             <FileText className="w-3.5 h-3.5 text-rose-600" />
             <span className="hidden sm:inline">Ekspor</span> PDF
           </button>
-
-          {/* Clear Logs (Owner Only) */}
-          {permissions.canClearActivityLogs && onClearLogs && (
-            <button
-              onClick={() => setIsClearConfirmOpen(true)}
-              className="px-3 py-2 bg-slate-100 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 text-slate-600 border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
-              title="Bersihkan riwayat log aktivitas (Khusus Owner)"
-            >
-              <Trash2 className="w-3.5 h-3.5 text-slate-500 hover:text-rose-600" />
-              <span className="hidden md:inline">Reset Log</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -731,6 +709,19 @@ export const ActivityLogManager: React.FC<ActivityLogManagerProps> = ({
                           <Eye className="w-3 h-3" />
                           <span>Rincian Payload</span>
                         </button>
+                        {permissions.canClearActivityLogs && onDeleteLog && (
+                          <button
+                            onClick={async () => {
+                              if (await confirmDelete(`Catatan Log "${log.title}"`, 'Apakah Anda Yakin Ingin Menghapus Data?', `ID: ${log.id} • Waktu: ${log.timestamp}`)) {
+                                onDeleteLog(log.id);
+                              }
+                            }}
+                            className="p-1.5 bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-slate-200 hover:border-rose-200 rounded-lg transition cursor-pointer"
+                            title="Hapus Log Ini Saja"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -787,13 +778,28 @@ export const ActivityLogManager: React.FC<ActivityLogManagerProps> = ({
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center whitespace-nowrap">
-                        <button
-                          onClick={() => setSelectedLogDetail(log)}
-                          className="p-1.5 bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-600 rounded-lg transition"
-                          title="Lihat Detail Snapshot"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => setSelectedLogDetail(log)}
+                            className="p-1.5 bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-600 rounded-lg transition"
+                            title="Lihat Detail Snapshot"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                          {permissions.canClearActivityLogs && onDeleteLog && (
+                            <button
+                              onClick={async () => {
+                                if (await confirmDelete(`Catatan Log "${log.title}"`, 'Apakah Anda Yakin Ingin Menghapus Data?', `ID: ${log.id} • Waktu: ${log.timestamp}`)) {
+                                  onDeleteLog(log.id);
+                                }
+                              }}
+                              className="p-1.5 bg-slate-100 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition"
+                              title="Hapus Log Ini Saja"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -1017,59 +1023,6 @@ export const ActivityLogManager: React.FC<ActivityLogManagerProps> = ({
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* CLEAR LOGS CONFIRMATION MODAL */}
-      {isClearConfirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 p-5 space-y-4">
-            <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
-              <AlertTriangle className="w-6 h-6" />
-            </div>
-            <div className="text-center space-y-1">
-              <h3 className="text-base font-bold text-slate-900">Bersihkan Riwayat Log Audit?</h3>
-              <p className="text-xs text-slate-500">
-                Tindakan ini akan menghapus seluruh data rekam jejak aktivitas operasional dari memori lokal.
-              </p>
-            </div>
-
-            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 space-y-1">
-              <div className="font-bold">Konfirmasi Keamanan (Khusus Owner):</div>
-              <p className="text-[11px] text-rose-700">
-                Ketik teks <span className="font-mono font-bold bg-white px-1.5 py-0.5 rounded border border-rose-300">hapus log</span> di bawah untuk melanjutkan.
-              </p>
-            </div>
-
-            <input
-              type="text"
-              value={clearConfirmText}
-              onChange={(e) => setClearConfirmText(e.target.value)}
-              placeholder="Ketik: hapus log"
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-center font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
-            />
-
-            <div className="flex gap-2 justify-end pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsClearConfirmOpen(false);
-                  setClearConfirmText('');
-                }}
-                className="w-1/2 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                disabled={clearConfirmText.trim().toLowerCase() !== 'hapus log'}
-                onClick={handleConfirmClearLogs}
-                className="w-1/2 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white rounded-xl text-xs font-semibold shadow-xs transition"
-              >
-                Hapus Semua Log
-              </button>
-            </div>
           </div>
         </div>
       )}

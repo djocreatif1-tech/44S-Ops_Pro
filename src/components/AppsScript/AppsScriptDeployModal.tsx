@@ -199,24 +199,6 @@ export const AppsScriptDeployModal: React.FC<Props> = ({
     }
   };
 
-  const handlePurgeDummyInSheets = async () => {
-    setIsTesting(true);
-    setStatusMsg({ type: 'info', text: 'Membersihkan seluruh baris data dummy dari Google Spreadsheet...' });
-    const res = await syncToGoogleAppsScript(urlInput.trim() || activeConfig.webAppUrl, 'purgeDummyData', {});
-    setIsTesting(false);
-    if (res.success) {
-      setStatusMsg({
-        type: 'success',
-        text: res.message || 'Seluruh data dummy di Google Spreadsheet telah dihapus bersih!'
-      });
-    } else {
-      setStatusMsg({
-        type: 'error',
-        text: res.message || 'Pastikan URL Web App telah terhubung.'
-      });
-    }
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/75 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl max-w-5xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[94vh] animate-in fade-in zoom-in-95 duration-200">
@@ -426,11 +408,11 @@ export const AppsScriptDeployModal: React.FC<Props> = ({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
                 <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
                   <div className="font-bold text-slate-800">1. setupDatabase()</div>
-                  <p className="text-[11px] text-slate-500 mt-0.5">Inisialisasi 16 tabel modul bersih tanpa data dummy &amp; menghapus baris dummy lama.</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Inisialisasi 16 tabel modul tanpa menghapus data yang sudah ada di Spreadsheet.</p>
                 </div>
                 <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                  <div className="font-bold text-rose-700">2. purgeDummyDataFromSpreadsheet()</div>
-                  <p className="text-[11px] text-slate-500 mt-0.5">Menghapus seluruh data dummy dari Spreadsheet tanpa menyentuh data riil Anda.</p>
+                  <div className="font-bold text-blue-700">2. Granular Edit &amp; Delete (1 ID)</div>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Edit &amp; Hapus fokus 100% hanya pada 1 baris ID yang dipilih tanpa pernah menghapus data lain.</p>
                 </div>
                 <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
                   <div className="font-bold text-emerald-700">3. optimizeAllDatabaseSheets()</div>
@@ -585,14 +567,6 @@ export const AppsScriptDeployModal: React.FC<Props> = ({
                     >
                       <Database className="w-3.5 h-3.5" />
                       <span>{isPulling ? 'Menarik Data...' : 'Tarik Data dari Spreadsheet'}</span>
-                    </button>
-
-                    <button
-                      onClick={handlePurgeDummyInSheets}
-                      disabled={isTesting}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600 text-white font-bold text-xs hover:bg-rose-700 transition shadow-sm disabled:opacity-50 cursor-pointer"
-                    >
-                      <span>Hapus Data Dummy di Spreadsheet</span>
                     </button>
                   </div>
 

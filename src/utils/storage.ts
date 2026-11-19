@@ -94,42 +94,10 @@ const STORAGE_KEYS = {
   SPAREPART_MOVEMENTS: 'fleetops_sparepart_movements_v1'
 };
 
-const DUMMY_ID_SET = new Set(DUMMY_RECORD_IDS);
-const DUMMY_COMPANIES = new Set([
-  'PT Sumber Makmur Mineral',
-  'PT Antar Lintas Logistik Nusantara',
-  'CV Berkah Perkasa Abadi',
-  'PT Cipta Bangun Konstruksi',
-  'PT Sinar Surya Persada',
-  'PT Krakatau Logistik Nusantara'
-]);
-const DUMMY_PLATES = new Set([
-  'B 9482 TDE',
-  'B 9104 KQA',
-  'B 9812 UXA',
-  'B 9231 KJD',
-  'B 9550 TLA',
-  'B 9773 UWB'
-]);
-
 export function stripDummyRecords<T>(items: T[]): T[] {
   if (!Array.isArray(items)) return [];
-  return items.filter((item: any) => {
-    if (!item || typeof item !== 'object') return false;
-    if (item.id && DUMMY_ID_SET.has(String(item.id))) return false;
-    if (item.companyName && DUMMY_COMPANIES.has(String(item.companyName))) return false;
-    if (item.nopol && DUMMY_PLATES.has(String(item.nopol))) return false;
-    if (item.plateNumber && DUMMY_PLATES.has(String(item.plateNumber))) return false;
-    return true;
-  });
+  return items.filter((item: any) => Boolean(item && typeof item === 'object'));
 }
-
-const REFERENCE_KEYS = new Set([
-  STORAGE_KEYS.USERS,
-  STORAGE_KEYS.PAYMENT_METHODS,
-  STORAGE_KEYS.SERVICE_TYPES,
-  STORAGE_KEYS.SIM_CLASSES
-]);
 
 function readStoredArray<T>(key: string, fallback: T[]): T[] {
   try {
@@ -137,14 +105,7 @@ function readStoredArray<T>(key: string, fallback: T[]): T[] {
     if (!raw) return fallback;
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      if (REFERENCE_KEYS.has(key)) {
-        return parsed;
-      }
-      const cleaned = stripDummyRecords<T>(parsed);
-      if (cleaned.length !== parsed.length) {
-        localStorage.setItem(key, JSON.stringify(cleaned));
-      }
-      return cleaned;
+      return parsed.filter((item: any) => Boolean(item && typeof item === 'object'));
     }
     localStorage.setItem(key, JSON.stringify(fallback));
     return fallback;
@@ -155,8 +116,7 @@ function readStoredArray<T>(key: string, fallback: T[]): T[] {
 
 function writeStoredArray<T>(key: string, data: T[]) {
   if (!Array.isArray(data)) return;
-  const toSave = REFERENCE_KEYS.has(key) ? data : stripDummyRecords(data);
-  localStorage.setItem(key, JSON.stringify(toSave));
+  localStorage.setItem(key, JSON.stringify(data));
 }
 
 import { normalizeAllowedModules } from './permissions';
