@@ -386,27 +386,40 @@ export function App() {
       pullFromGas(true);
     }
 
-    // Initialize Auth Session & Lock Screen from Storage
-    const savedSession = getStoredAuthSession();
-    if (savedSession) {
-      const storedUsers = asArray<UserAccount>(initial.users);
-      const matchedUser =
-        storedUsers.find((u) => u.id === savedSession.userId) ||
-        storedUsers.find((u) => u.role === savedSession.userRole);
-      const syncedSession: AuthSession = {
-        ...savedSession,
-        allowedTabs: matchedUser
-          ? normalizeAllowedModules(matchedUser.allowedTabs, matchedUser.role, true)
-          : normalizeAllowedModules(savedSession.allowedTabs, savedSession.userRole, true)
-      };
-      setAuthSession(syncedSession);
-      saveStoredAuthSession(syncedSession);
-      setUserRole(syncedSession.userRole);
-      setCurrentUserId(matchedUser ? matchedUser.id : syncedSession.userId);
-    }
-    const savedLock = getStoredIsLocked();
-    setIsLocked(savedLock);
+    // Mandatory Login Gate: Always require explicit login when the web address is accessed
+    getStoredAuthSession();
+    saveStoredAuthSession(null);
+    setAuthSession(null);
+    setIsLocked(false);
+    saveStoredIsLocked(false);
   }, []);
+
+  // Automatic Inactivity Session Timeout (30 minutes) to protect unattended browsers
+  useEffect(() => {
+    if (!authSession) return;
+    const INACTIVITY_LIMIT_MS = 30 * 60 * 1000;
+    let inactivityTimer: ReturnType<typeof setTimeout>;
+
+    const resetInactivityTimer = () => {
+      clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(() => {
+        setAuthSession(null);
+        saveStoredAuthSession(null);
+        setIsLocked(false);
+        saveStoredIsLocked(false);
+        showCenterCrudNotification('Sesi kerja otomatis berakhir karena tidak ada aktivitas selama 30 menit. Silakan login kembali.', 'info');
+      }, INACTIVITY_LIMIT_MS);
+    };
+
+    const activityEvents = ['mousedown', 'keydown', 'touchstart', 'scroll'];
+    activityEvents.forEach((evt) => window.addEventListener(evt, resetInactivityTimer, { passive: true }));
+    resetInactivityTimer();
+
+    return () => {
+      clearTimeout(inactivityTimer);
+      activityEvents.forEach((evt) => window.removeEventListener(evt, resetInactivityTimer));
+    };
+  }, [authSession]);
 
   // Keep AuthSession.allowedTabs and currentUserId 100% synchronized with live Manajemen Pengguna (users) state
   useEffect(() => {
@@ -690,8 +703,12 @@ export function App() {
     showToast('Layar kerja berhasil dibuka!', 'success');
   };
 
-  // Role Switcher Handler
+  // Role Switcher Handler (Restricted strictly to authenticated Owner accounts)
   const handleRoleChange = (newRole: UserRole) => {
+    if (userRole !== 'owner' && authSession?.userRole !== 'owner') {
+      showToast('Akses ditolak: Hanya Owner yang memiliki otorisasi simulasi peran.', 'error');
+      return;
+    }
     setUserRole(newRole);
     saveStoredUserRole(newRole);
     if (newRole !== 'owner') {

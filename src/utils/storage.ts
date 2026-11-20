@@ -448,50 +448,35 @@ export const isRunningInGAS = (): boolean => {
 
 export const getStoredAuthSession = (): AuthSession | null => {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.AUTH_SESSION);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        return {
-          ...parsed,
-          allowedTabs: normalizeAllowedModules(parsed.allowedTabs, parsed.userRole)
-        };
-      }
-    }
-    if (localStorage.getItem('fleetops_logged_out_v1') === 'true') {
-      return null;
-    }
-    const ownerAccount = INITIAL_USER_ACCOUNTS.find((u) => u.role === 'owner') || INITIAL_USER_ACCOUNTS[0];
-    const defaultSession: AuthSession = {
-      userId: ownerAccount.id,
-      username: ownerAccount.username,
-      userName: ownerAccount.name,
-      userRole: ownerAccount.role,
-      email: ownerAccount.email,
-      department: ownerAccount.department,
-      loginTime: new Date().toISOString(),
-      allowedTabs: normalizeAllowedModules(ownerAccount.allowedTabs, ownerAccount.role)
-    };
-    localStorage.setItem(STORAGE_KEYS.AUTH_SESSION, JSON.stringify(defaultSession));
-    return defaultSession;
+    // Purge any legacy auto-login session stored in localStorage/sessionStorage on fresh page access
+    // so accessing the web URL always requires explicit authentication on the Login Screen.
+    localStorage.removeItem(STORAGE_KEYS.AUTH_SESSION);
+    sessionStorage.removeItem(STORAGE_KEYS.AUTH_SESSION);
+    return null;
   } catch {
     return null;
   }
 };
 
 export const saveStoredAuthSession = (session: AuthSession | null) => {
-  if (session) {
-    localStorage.removeItem('fleetops_logged_out_v1');
-    localStorage.setItem(
-      STORAGE_KEYS.AUTH_SESSION,
-      JSON.stringify({
-        ...session,
-        allowedTabs: normalizeAllowedModules(session.allowedTabs, session.userRole, true)
-      })
-    );
-  } else {
-    localStorage.setItem('fleetops_logged_out_v1', 'true');
+  try {
+    // Never persist authentication sessions in localStorage across browser visits
     localStorage.removeItem(STORAGE_KEYS.AUTH_SESSION);
+    if (session) {
+      localStorage.removeItem('fleetops_logged_out_v1');
+      sessionStorage.setItem(
+        STORAGE_KEYS.AUTH_SESSION,
+        JSON.stringify({
+          ...session,
+          allowedTabs: normalizeAllowedModules(session.allowedTabs, session.userRole, true)
+        })
+      );
+    } else {
+      localStorage.setItem('fleetops_logged_out_v1', 'true');
+      sessionStorage.removeItem(STORAGE_KEYS.AUTH_SESSION);
+    }
+  } catch {
+    // ignore storage errors
   }
 };
 

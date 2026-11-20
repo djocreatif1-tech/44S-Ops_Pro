@@ -359,7 +359,9 @@ const resolveActiveUserAllowedTabs = (role: UserRole, explicitTabs?: string[]): 
   }
   try {
     if (typeof window !== 'undefined' && window.localStorage) {
-      const sessionRaw = window.localStorage.getItem('fleetops_auth_session_v1');
+      const sessionRaw =
+        (window.sessionStorage && window.sessionStorage.getItem('fleetops_auth_session_v1')) ||
+        window.localStorage.getItem('fleetops_auth_session_v1');
       const session = sessionRaw ? JSON.parse(sessionRaw) : null;
 
       // 1. Always check the authoritative users list (Manajemen Pengguna) first

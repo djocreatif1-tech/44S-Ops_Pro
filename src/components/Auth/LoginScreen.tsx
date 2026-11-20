@@ -86,9 +86,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutSeconds, setLockoutSeconds] = useState(0);
 
   // Background scene index (default: sawah padi hijau yang estetik)
   const [bgSceneIndex, setBgSceneIndex] = useState(0);
@@ -103,10 +104,26 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     return () => clearInterval(timer);
   }, []);
 
+  // Brute-force lockout countdown timer
+  useEffect(() => {
+    if (lockoutSeconds <= 0) return;
+    const interval = setInterval(() => {
+      setLockoutSeconds((prev) => {
+        if (prev <= 1) {
+          setErrorMessage(null);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [lockoutSeconds]);
+
   // Helper to execute successful login
   const completeLogin = (user: UserAccount) => {
     setIsLoading(true);
     setErrorMessage(null);
+    setFailedAttempts(0);
 
     setTimeout(() => {
       setIsLoading(false);
@@ -133,7 +150,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         department: user.department,
         avatarUrl: user.avatarUrl,
         loginTime,
-        isRemembered: rememberMe,
+        isRemembered: false,
         allowedTabs: normalizeAllowedModules(user.allowedTabs, user.role, true)
       };
 
@@ -145,12 +162,28 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     }, 350);
   };
 
+  const registerFailedAttempt = (msg: string) => {
+    const nextAttempts = failedAttempts + 1;
+    setFailedAttempts(nextAttempts);
+    if (nextAttempts >= 5) {
+      setLockoutSeconds(30);
+      setErrorMessage('Terlalu banyak percobaan login gagal (5x). Demi keamanan, akses dikunci sementara selama 30 detik.');
+    } else {
+      setErrorMessage(`${msg} (Percobaan gagal: ${nextAttempts}/5)`);
+    }
+  };
+
   // Handle Form Submission
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (lockoutSeconds > 0) {
+      setErrorMessage(`Akses login sedang dikunci sementara. Silakan tunggu ${lockoutSeconds} detik lagi.`);
+      return;
+    }
     setErrorMessage(null);
 
-    const cleanIdentifier = (identifier || '').trim().toLowerCase();
+    const rawIdentifier = (identifier || '').trim().toLowerCase();
+    const cleanIdentifier = rawIdentifier.startsWith('@') ? rawIdentifier.slice(1) : rawIdentifier;
     const cleanPassword = (password || '').trim();
 
     if (!cleanIdentifier || !cleanPassword) {
@@ -158,16 +191,20 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       return;
     }
 
-    // Match by email, username, or role
-    const matchedUser = users.find(
-      u =>
-        (u.email && u.email.toLowerCase() === cleanIdentifier) ||
-        (u.username && u.username.toLowerCase() === cleanIdentifier) ||
-        (u.role && u.role.toLowerCase() === cleanIdentifier)
-    );
+    // Strict match by registered username or email only (no role-name bypass)
+    const matchedUser = users.find((u) => {
+      if (!u) return false;
+      const uEmail = String(u.email || '').trim().toLowerCase();
+      const rawUsername = String(u.username || '').trim().toLowerCase();
+      const uUsername = rawUsername.startsWith('@') ? rawUsername.slice(1) : rawUsername;
+      return (
+        (uEmail && (uEmail === rawIdentifier || uEmail === cleanIdentifier)) ||
+        (uUsername && (uUsername === cleanIdentifier || rawUsername === rawIdentifier))
+      );
+    });
 
     if (!matchedUser) {
-      setErrorMessage('Akun tidak ditemukan. Pastikan Username atau Email Anda sudah terdaftar.');
+      registerFailedAttempt('Kredensial tidak valid. Pastikan Username / Email dan Password Anda benar.');
       return;
     }
 
@@ -176,19 +213,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       return;
     }
 
-    const validPassword = matchedUser.password || 'owner123';
-    const validPin = matchedUser.pin || '123456';
+    const expectedPassword = String(matchedUser.password || '').trim();
+    const expectedPin = String(matchedUser.pin || '').trim();
 
-    // Check credentials match
-    if (
-      cleanPassword !== validPassword &&
-      cleanPassword !== validPin &&
-      cleanPassword !== '123456' &&
-      cleanPassword !== 'owner123' &&
-      cleanPassword !== 'admin123' &&
-      cleanPassword !== 'admin222'
-    ) {
-      setErrorMessage('Kata sandi atau PIN salah. Silakan periksa kembali kredensial Anda.');
+    // Strict per-user credential verification (no shared backdoor passwords across accounts)
+    const isPasswordValid = expectedPassword !== '' && cleanPassword === expectedPassword;
+    const isPinValid = expectedPin !== '' && cleanPassword === expectedPin;
+
+    if (!isPasswordValid && !isPinValid) {
+      registerFailedAttempt('Kata sandi atau PIN salah. Silakan periksa kembali kredensial akun Anda.');
       return;
     }
 
@@ -407,8 +440,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                       type="text"
                       value={identifier}
                       onChange={(e) => setIdentifier(e.target.value)}
-                      placeholder="Contoh: owner, admin1, atau email"
-                      className="w-full pl-10 pr-4 py-3.5 bg-slate-950/80 border border-slate-700/80 rounded-2xl text-white text-sm placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition font-medium shadow-inner"
+                      disabled={lockoutSeconds > 0 || isLoading}
+                      placeholder="Masukkan username atau email terdaftar"
+                      className="w-full pl-10 pr-4 py-3.5 bg-slate-950/80 border border-slate-700/80 rounded-2xl text-white text-sm placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition font-medium shadow-inner disabled:opacity-50"
                       required
                       autoComplete="username"
                     />
@@ -430,8 +464,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      disabled={lockoutSeconds > 0 || isLoading}
                       placeholder="Masukkan kata sandi atau PIN"
-                      className="w-full pl-10 pr-11 py-3.5 bg-slate-950/80 border border-slate-700/80 rounded-2xl text-white text-sm placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition font-medium shadow-inner"
+                      className="w-full pl-10 pr-11 py-3.5 bg-slate-950/80 border border-slate-700/80 rounded-2xl text-white text-sm placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition font-medium shadow-inner disabled:opacity-50"
                       required
                       autoComplete="current-password"
                     />
@@ -446,26 +481,21 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   </div>
                 </div>
 
-                {/* Remember Me Checkbox */}
-                <div className="flex items-center justify-between text-xs pt-1">
-                  <label className="flex items-center gap-2 text-slate-300 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="rounded border-slate-700 bg-slate-950 text-emerald-600 focus:ring-0 w-4 h-4 cursor-pointer"
-                    />
-                    <span>Ingat sesi masuk di perangkat ini</span>
-                  </label>
+                {/* Security Policy Notice */}
+                <div className="flex items-center gap-2 text-[11px] text-emerald-300/90 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Keamanan Aktif: Wajib autentikasi login setiap mengakses alamat web.</span>
                 </div>
 
                 {/* Submit Action Button */}
                 <button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={isLoading || lockoutSeconds > 0}
                   className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-600 via-blue-600 to-sky-600 hover:from-emerald-500 hover:to-sky-500 text-white font-bold text-sm rounded-2xl shadow-xl shadow-emerald-600/25 hover:shadow-emerald-600/40 active:scale-[0.99] transition duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2"
                 >
-                  {isLoading ? (
+                  {lockoutSeconds > 0 ? (
+                    <span>Terkunci Sementara ({lockoutSeconds}d)</span>
+                  ) : isLoading ? (
                     <div className="flex items-center gap-2">
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                       <span>Memverifikasi Akun...</span>

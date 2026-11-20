@@ -46,10 +46,16 @@ export const LockScreen: React.FC<LockScreenProps> = ({
     e.preventDefault();
     setErrorMessage(null);
 
-    const validPin = currentUser?.pin || '123456';
-    const validPass = currentUser?.password || 'owner123';
+    const cleanInput = (pin || '').trim();
+    if (!cleanInput) {
+      setErrorMessage('Silakan masukkan PIN atau Password akun Anda untuk membuka kunci.');
+      return;
+    }
 
-    if (pin.trim() === validPin || pin.trim() === validPass || pin.trim() === '123456' || pin.trim() === '') {
+    const validPin = String(currentUser?.pin || '').trim();
+    const validPass = String(currentUser?.password || '').trim();
+
+    if ((validPin !== '' && cleanInput === validPin) || (validPass !== '' && cleanInput === validPass)) {
       onUnlock();
     } else {
       setErrorMessage('PIN atau Password yang Anda masukkan tidak sesuai.');
