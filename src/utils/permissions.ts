@@ -332,44 +332,15 @@ export const normalizeAllowedModules = (tabs?: string[], role?: UserRole, preser
 
   for (const rawId of tabs) {
     if (!rawId || typeof rawId !== 'string') continue;
-    if (VALID_SYSTEM_MODULE_IDS.has(rawId)) {
-      normalizedSet.add(rawId);
-    } else if (rawId.startsWith('master_')) {
+    const cleanId = rawId.trim();
+    if (VALID_SYSTEM_MODULE_IDS.has(cleanId)) {
+      normalizedSet.add(cleanId);
+    } else if (cleanId.startsWith('master_')) {
       normalizedSet.add('master_hub');
     }
   }
 
-  // Upgrade legacy default 12/7/7 tab sets that predated finance_pocket, finance_equipment, tripsheet, sparepart_inventory
-  const isLegacyOwnerSet =
-    role === 'owner' &&
-    tabs.length === 12 &&
-    !tabs.includes('finance_pocket') &&
-    !tabs.includes('tripsheet');
-  if (isLegacyOwnerSet) {
-    ROLE_PERMISSIONS_MAP.owner.allowedTabs.forEach((id) => normalizedSet.add(id));
-  }
-
-  const isLegacyAdmin1Set =
-    role === 'admin1' &&
-    tabs.length === 7 &&
-    tabs.includes('finance') &&
-    !tabs.includes('finance_pocket') &&
-    !tabs.includes('tripsheet');
-  if (isLegacyAdmin1Set) {
-    ROLE_PERMISSIONS_MAP.admin1.allowedTabs.forEach((id) => normalizedSet.add(id));
-  }
-
-  const isLegacyAdmin2Set =
-    role === 'admin2' &&
-    tabs.length === 7 &&
-    tabs.includes('vehicles') &&
-    !tabs.includes('tripsheet') &&
-    !tabs.includes('sparepart_inventory');
-  if (isLegacyAdmin2Set) {
-    ROLE_PERMISSIONS_MAP.admin2.allowedTabs.forEach((id) => normalizedSet.add(id));
-  }
-
-  // Return in canonical SYSTEM_MODULES order
+  // Return in canonical SYSTEM_MODULES order without force-adding unchecked modules
   return SYSTEM_MODULES.map((m) => m.id).filter((id) => normalizedSet.has(id));
 };
 
@@ -380,6 +351,7 @@ export const getDefaultModulesForRole = (role: UserRole): string[] => {
 /**
  * Helper to read the currently active user's checked modules from localStorage
  * when components call getRolePermissions(userRole) without passing allowedTabs.
+ * Prioritizes the authoritative user account record in fleetops_users_v1.
  */
 const resolveActiveUserAllowedTabs = (role: UserRole, explicitTabs?: string[]): string[] => {
   if (Array.isArray(explicitTabs)) {
@@ -388,21 +360,39 @@ const resolveActiveUserAllowedTabs = (role: UserRole, explicitTabs?: string[]): 
   try {
     if (typeof window !== 'undefined' && window.localStorage) {
       const sessionRaw = window.localStorage.getItem('fleetops_auth_session_v1');
-      if (sessionRaw) {
-        const session = JSON.parse(sessionRaw);
-        if (session && session.userRole === role && Array.isArray(session.allowedTabs)) {
-          return normalizeAllowedModules(session.allowedTabs, role, true);
-        }
-      }
+      const session = sessionRaw ? JSON.parse(sessionRaw) : null;
+
+      // 1. Always check the authoritative users list (Manajemen Pengguna) first
       const usersRaw = window.localStorage.getItem('fleetops_users_v1');
       if (usersRaw) {
         const users = JSON.parse(usersRaw);
-        if (Array.isArray(users)) {
-          const matchedUser = users.find((u: any) => u && u.role === role && Array.isArray(u.allowedTabs));
-          if (matchedUser) {
+        if (Array.isArray(users) && users.length > 0) {
+          let matchedUser = null;
+          if (session && session.userRole === role) {
+            matchedUser =
+              users.find((u: any) => u && u.id === session.userId) ||
+              users.find(
+                (u: any) =>
+                  u &&
+                  u.username &&
+                  session.username &&
+                  String(u.username).toLowerCase() === String(session.username).toLowerCase()
+              );
+          }
+          if (!matchedUser) {
+            matchedUser =
+              users.find((u: any) => u && u.role === role && u.status === 'active' && Array.isArray(u.allowedTabs)) ||
+              users.find((u: any) => u && u.role === role && Array.isArray(u.allowedTabs));
+          }
+          if (matchedUser && Array.isArray(matchedUser.allowedTabs)) {
             return normalizeAllowedModules(matchedUser.allowedTabs, role, true);
           }
         }
+      }
+
+      // 2. Fallback to session.allowedTabs if present
+      if (session && session.userRole === role && Array.isArray(session.allowedTabs)) {
+        return normalizeAllowedModules(session.allowedTabs, role, true);
       }
     }
   } catch {

@@ -232,6 +232,7 @@ export const UserManager: React.FC<UserManagerProps> = ({
     }
 
     const roleMeta = ROLE_DEFINITIONS[quickTargetRole];
+    const normalizedTabs = normalizeAllowedModules(quickModules, quickTargetRole, true);
     const updated: UserAccount = {
       ...quickTargetUser,
       role: quickTargetRole,
@@ -239,7 +240,8 @@ export const UserManager: React.FC<UserManagerProps> = ({
         quickTargetRole !== quickTargetUser.role
           ? roleMeta?.category || quickTargetUser.department
           : quickTargetUser.department,
-      allowedTabs: normalizeAllowedModules(quickModules, quickTargetRole, true)
+      allowedTabs: normalizedTabs,
+      ...( { allowedModulesJson: JSON.stringify(normalizedTabs) } as any )
     };
 
     onUpdateUser(updated);
@@ -291,6 +293,7 @@ export const UserManager: React.FC<UserManagerProps> = ({
     }
 
     const roleMeta = ROLE_DEFINITIONS[formData.role];
+    const normalizedTabs = normalizeAllowedModules(formData.allowedTabs, formData.role, true);
     const newUser: UserAccount = {
       id: 'USR-' + Date.now(),
       name: formData.name.trim(),
@@ -300,12 +303,13 @@ export const UserManager: React.FC<UserManagerProps> = ({
       pin: formData.pin.trim() || '123456',
       role: formData.role,
       department: roleMeta?.category || 'Operasional',
-      allowedTabs: normalizeAllowedModules(formData.allowedTabs, formData.role, true),
+      allowedTabs: normalizedTabs,
       phone: formData.phone.trim(),
       status: formData.status,
       createdAt: new Date().toISOString().split('T')[0],
       lastLogin: 'Belum pernah login',
-      notes: formData.notes.trim()
+      notes: formData.notes.trim(),
+      ...( { allowedModulesJson: JSON.stringify(normalizedTabs) } as any )
     };
 
     onAddUser(newUser);
@@ -343,6 +347,7 @@ export const UserManager: React.FC<UserManagerProps> = ({
     }
 
     const roleMeta = ROLE_DEFINITIONS[formData.role];
+    const normalizedTabs = normalizeAllowedModules(formData.allowedTabs, formData.role, true);
     const updated: UserAccount = {
       ...selectedUser,
       name: formData.name.trim(),
@@ -355,7 +360,8 @@ export const UserManager: React.FC<UserManagerProps> = ({
         formData.role !== selectedUser.role
           ? roleMeta?.category || selectedUser.department
           : selectedUser.department,
-      allowedTabs: normalizeAllowedModules(formData.allowedTabs, formData.role, true),
+      allowedTabs: normalizedTabs,
+      ...( { allowedModulesJson: JSON.stringify(normalizedTabs) } as any ),
       phone: formData.phone.trim(),
       status: formData.status,
       notes: formData.notes.trim()

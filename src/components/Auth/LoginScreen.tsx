@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { UserAccount, AuthSession } from '../../types';
-import { getRoleMeta } from '../../utils/permissions';
+import { getRoleMeta, normalizeAllowedModules } from '../../utils/permissions';
 
 interface LoginScreenProps {
   users: UserAccount[];
@@ -133,7 +133,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         department: user.department,
         avatarUrl: user.avatarUrl,
         loginTime,
-        isRemembered: rememberMe
+        isRemembered: rememberMe,
+        allowedTabs: normalizeAllowedModules(user.allowedTabs, user.role, true)
       };
 
       if (onShowNotification) {

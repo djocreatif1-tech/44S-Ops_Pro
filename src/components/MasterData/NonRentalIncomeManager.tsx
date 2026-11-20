@@ -29,6 +29,7 @@ import {
   UserRole
 } from '../../types';
 import { formatRupiah, formatDateIndo } from '../../utils/formatters';
+import { getRolePermissions } from '../../utils/permissions';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -76,7 +77,8 @@ export const NonRentalIncomeManager: React.FC<NonRentalIncomeManagerProps> = ({
     notes: ''
   });
 
-  const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin' || userRole === 'finance';
+  const perms = getRolePermissions(userRole);
+  const isOwnerOrAdmin = perms.canManageNonRentalCategory;
 
   // Filtered categories
   const filteredCategories = safeCategories.filter((cat) => {

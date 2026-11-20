@@ -300,7 +300,17 @@ export function normalizeSingleRecord(raw: any, index: number, prefix = 'REC'): 
     }
   }
 
-  // 4. Parse allowedModulesJson if present on user records
+  // 4. Parse allowedTabs / allowedModulesJson if present on user records
+  if (typeof merged.allowedTabs === 'string' && merged.allowedTabs.trim().startsWith('[')) {
+    try {
+      const parsed = JSON.parse(merged.allowedTabs);
+      if (Array.isArray(parsed)) {
+        merged.allowedTabs = parsed;
+      }
+    } catch {
+      // ignore
+    }
+  }
   if (!Array.isArray(merged.allowedTabs) && typeof merged.allowedModulesJson === 'string') {
     try {
       const parsedTabs = JSON.parse(merged.allowedModulesJson);
@@ -310,6 +320,9 @@ export function normalizeSingleRecord(raw: any, index: number, prefix = 'REC'): 
     } catch {
       // ignore
     }
+  }
+  if (Array.isArray(merged.allowedTabs)) {
+    merged.allowedModulesJson = JSON.stringify(merged.allowedTabs);
   }
 
   // 5. Guard against legacy misaligned vehicle columns (e.g. Bahan Bakar containing driver name or No. Rangka containing status)

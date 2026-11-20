@@ -396,8 +396,8 @@ export function App() {
       const syncedSession: AuthSession = {
         ...savedSession,
         allowedTabs: matchedUser
-          ? normalizeAllowedModules(matchedUser.allowedTabs, matchedUser.role)
-          : normalizeAllowedModules(savedSession.allowedTabs, savedSession.userRole)
+          ? normalizeAllowedModules(matchedUser.allowedTabs, matchedUser.role, true)
+          : normalizeAllowedModules(savedSession.allowedTabs, savedSession.userRole, true)
       };
       setAuthSession(syncedSession);
       saveStoredAuthSession(syncedSession);
@@ -407,6 +407,49 @@ export function App() {
     const savedLock = getStoredIsLocked();
     setIsLocked(savedLock);
   }, []);
+
+  // Keep AuthSession.allowedTabs and currentUserId 100% synchronized with live Manajemen Pengguna (users) state
+  useEffect(() => {
+    if (!Array.isArray(users) || users.length === 0) return;
+    const matchedUser =
+      (currentUserId ? users.find((u) => u && String(u.id).trim() === String(currentUserId).trim()) : undefined) ||
+      (authSession?.userId ? users.find((u) => u && String(u.id).trim() === String(authSession.userId).trim()) : undefined) ||
+      users.find((u) => u && u.role === userRole && u.status === 'active') ||
+      users.find((u) => u && u.role === userRole);
+
+    if (!matchedUser) return;
+
+    if (matchedUser.id !== currentUserId) {
+      setCurrentUserId(matchedUser.id);
+    }
+
+    const authoritativeTabs = normalizeAllowedModules(matchedUser.allowedTabs, matchedUser.role, true);
+    if (authSession) {
+      const currentSessionTabs = Array.isArray(authSession.allowedTabs) ? authSession.allowedTabs : [];
+      const tabsChanged =
+        currentSessionTabs.length !== authoritativeTabs.length ||
+        authoritativeTabs.some((t, idx) => currentSessionTabs[idx] !== t);
+      const userChanged =
+        authSession.userId !== matchedUser.id ||
+        authSession.userRole !== matchedUser.role ||
+        authSession.userName !== matchedUser.name;
+
+      if (tabsChanged || userChanged) {
+        const syncedSession: AuthSession = {
+          ...authSession,
+          userId: matchedUser.id,
+          userName: matchedUser.name,
+          username: matchedUser.username,
+          userRole: matchedUser.role,
+          email: matchedUser.email,
+          department: matchedUser.department,
+          allowedTabs: authoritativeTabs
+        };
+        setAuthSession(syncedSession);
+        saveStoredAuthSession(syncedSession);
+      }
+    }
+  }, [users, currentUserId, userRole]);
 
   // Multi-Device & Multi-Tab Real-time Synchronization Listeners (HP & PC)
   useEffect(() => {
@@ -579,11 +622,22 @@ export function App() {
 
   // Authentication Handlers
   const handleLoginSuccess = (session: AuthSession) => {
-    setAuthSession(session);
-    setUserRole(session.userRole);
-    setCurrentUserId(session.userId);
-    saveStoredAuthSession(session);
-    saveStoredUserRole(session.userRole);
+    const matchedUser =
+      users.find((u) => u && String(u.id).trim() === String(session.userId).trim()) ||
+      users.find((u) => u && u.role === session.userRole && u.status === 'active') ||
+      users.find((u) => u && u.role === session.userRole);
+    const normalizedTabs = matchedUser
+      ? normalizeAllowedModules(matchedUser.allowedTabs, matchedUser.role, true)
+      : normalizeAllowedModules(session.allowedTabs, session.userRole, true);
+    const syncedSession: AuthSession = {
+      ...session,
+      allowedTabs: normalizedTabs
+    };
+    setAuthSession(syncedSession);
+    setUserRole(syncedSession.userRole);
+    setCurrentUserId(matchedUser ? matchedUser.id : syncedSession.userId);
+    saveStoredAuthSession(syncedSession);
+    saveStoredUserRole(syncedSession.userRole);
     setIsLocked(false);
     saveStoredIsLocked(false);
 
@@ -591,16 +645,16 @@ export function App() {
       'user',
       'login',
       'Masuk Sistem (Login Berhasil)',
-      `Pengguna ${session.userName} (@${session.username}) berhasil masuk ke sistem dengan peran ${session.userRole.toUpperCase()}.`,
-      session.userId,
-      session.userName,
-      { email: session.email, role: session.userRole, department: session.department },
+      `Pengguna ${syncedSession.userName} (@${syncedSession.username}) berhasil masuk ke sistem dengan peran ${syncedSession.userRole.toUpperCase()}.`,
+      syncedSession.userId,
+      syncedSession.userName,
+      { email: syncedSession.email, role: syncedSession.userRole, department: syncedSession.department },
       'success'
     );
 
-    // If active tab is not permitted for the user's role/modules, auto-route to dashboard
-    if (!isTabPermitted(session.userRole, currentTab, session.allowedTabs)) {
-      setCurrentTab('dashboard');
+    // If active tab is not permitted for the user's role/modules, auto-route to first allowed tab
+    if (!isTabPermitted(syncedSession.userRole, currentTab, normalizedTabs)) {
+      setCurrentTab(normalizedTabs[0] || 'dashboard');
     }
   };
 
@@ -3078,18 +3132,26 @@ export function App() {
   const handleUpdateUserAccount = (usr: UserAccount) => {
     if (!usr?.id) return;
     const targetId = String(usr.id).trim();
+    const normalizedTabs = normalizeAllowedModules(usr.allowedTabs, usr.role, true);
     const normalizedUser: UserAccount = {
       ...usr,
-      allowedTabs: normalizeAllowedModules(usr.allowedTabs, usr.role, true)
+      allowedTabs: normalizedTabs,
+      ...( { allowedModulesJson: JSON.stringify(normalizedTabs) } as any )
     };
     const updated = users.map(u => (String(u.id).trim() === targetId ? normalizedUser : u));
     setUsers(updated);
     saveStoredUserAccounts(updated);
 
-    // If current session is updated (or matches active userId), sync session data immediately
-    if (authSession && (authSession.userId === normalizedUser.id || currentUserId === normalizedUser.id)) {
+    // If current session is updated (or matches active userId / role), sync session data immediately
+    if (
+      authSession &&
+      (authSession.userId === normalizedUser.id ||
+        currentUserId === normalizedUser.id ||
+        userRole === normalizedUser.role)
+    ) {
       const updatedSession: AuthSession = {
         ...authSession,
+        userId: normalizedUser.id,
         userName: normalizedUser.name,
         email: normalizedUser.email,
         department: normalizedUser.department,
@@ -3100,6 +3162,9 @@ export function App() {
       saveStoredAuthSession(updatedSession);
       setUserRole(normalizedUser.role);
       saveStoredUserRole(normalizedUser.role);
+      if (!isTabPermitted(normalizedUser.role, currentTab, normalizedUser.allowedTabs)) {
+        setCurrentTab(normalizedUser.allowedTabs[0] || 'dashboard');
+      }
     }
 
     createActivityLog(
@@ -3279,8 +3344,17 @@ export function App() {
     );
   }
 
+  // Compute authoritative active modules from live Manajemen Pengguna user profile
+  const activeAllowedTabs = currentUser
+    ? normalizeAllowedModules(currentUser.allowedTabs, userRole, true)
+    : normalizeAllowedModules(authSession?.allowedTabs, userRole, true);
+  const effectiveAuthSession: AuthSession = {
+    ...authSession,
+    allowedTabs: activeAllowedTabs
+  };
+
   // Check RBAC permission for current active tab
-  const isCurrentTabAllowed = isTabPermitted(userRole, currentTab, authSession?.allowedTabs);
+  const isCurrentTabAllowed = isTabPermitted(userRole, currentTab, activeAllowedTabs);
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans text-slate-900 selection:bg-blue-600 selection:text-white">
@@ -3305,7 +3379,7 @@ export function App() {
         userRole={userRole}
         onChangeUserRole={handleRoleChange}
         onOpenRoleMatrix={() => setIsRoleMatrixModalOpen(true)}
-        authSession={authSession}
+        authSession={effectiveAuthSession}
         currentUser={currentUser}
         onOpenProfile={() => setIsUserProfileModalOpen(true)}
         onLockScreen={handleLockScreen}
@@ -3324,7 +3398,7 @@ export function App() {
           onOpenRoleMatrix={() => setIsRoleMatrixModalOpen(true)}
           isMobileOpen={isMobileSidebarOpen}
           onCloseMobile={() => setIsMobileSidebarOpen(false)}
-          authSession={authSession}
+          authSession={effectiveAuthSession}
           onLogout={handleLogout}
           onLockScreen={handleLockScreen}
           onOpenProfile={() => setIsUserProfileModalOpen(true)}
@@ -3484,7 +3558,7 @@ export function App() {
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        {isTabPermitted(userRole, 'tripsheet', authSession?.allowedTabs) && (
+                        {isTabPermitted(userRole, 'tripsheet', activeAllowedTabs) && (
                           <button
                             onClick={() => setCurrentTab('tripsheet')}
                             className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold text-[11px] transition cursor-pointer"
@@ -3492,7 +3566,7 @@ export function App() {
                             Buka Trip Sheet
                           </button>
                         )}
-                        {isTabPermitted(userRole, 'finance', authSession?.allowedTabs) && (
+                        {isTabPermitted(userRole, 'finance', activeAllowedTabs) && (
                           <button
                             onClick={() => setCurrentTab('finance')}
                             className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg font-semibold text-[11px] transition cursor-pointer"
@@ -3530,7 +3604,7 @@ export function App() {
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        {isTabPermitted(userRole, 'sparepart_inventory', authSession?.allowedTabs) && (
+                        {isTabPermitted(userRole, 'sparepart_inventory', activeAllowedTabs) && (
                           <button
                             onClick={() => setCurrentTab('sparepart_inventory')}
                             className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold text-[11px] transition cursor-pointer"
@@ -3538,7 +3612,7 @@ export function App() {
                             Buka Inventory Sparepart
                           </button>
                         )}
-                        {isTabPermitted(userRole, 'finance', authSession?.allowedTabs) && (
+                        {isTabPermitted(userRole, 'finance', activeAllowedTabs) && (
                           <button
                             onClick={() => setCurrentTab('finance')}
                             className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg font-semibold text-[11px] transition cursor-pointer"

@@ -14,7 +14,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { UserRole } from '../../types';
-import { ROLE_DEFINITIONS, ROLE_PERMISSIONS_MAP, RoleMeta } from '../../utils/permissions';
+import { ROLE_DEFINITIONS, getRolePermissions } from '../../utils/permissions';
 
 interface RolePermissionsModalProps {
   isOpen: boolean;
@@ -61,7 +61,7 @@ export const RolePermissionsModal: React.FC<RolePermissionsModalProps> = ({
   ];
 
   const getMatrixCheck = (role: UserRole, rowKey: string): boolean => {
-    const perms = ROLE_PERMISSIONS_MAP[role];
+    const perms = getRolePermissions(role);
     switch (rowKey) {
       case 'dashboard':
         return perms.allowedTabs.includes('dashboard');

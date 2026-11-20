@@ -34,6 +34,7 @@ import {
   UserRole
 } from '../../types';
 import { formatRupiah, formatDateIndo } from '../../utils/formatters';
+import { getRolePermissions } from '../../utils/permissions';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -103,7 +104,8 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
     notes: ''
   });
 
-  const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin1';
+  const perms = getRolePermissions(userRole);
+  const isOwnerOrAdmin = perms.canManageNonRentalCategory || perms.canAddAccount;
 
   // Distinct company list
   const uniqueCompanies = Array.from(

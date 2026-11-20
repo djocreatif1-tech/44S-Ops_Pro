@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { FinancialAccount, CompanyDeposit, UserRole } from '../../types';
 import { formatRupiah, formatDateIndo } from '../../utils/formatters';
+import { getRolePermissions } from '../../utils/permissions';
 import { TablePagination } from '../Common/TablePagination';
 import { confirmDelete } from '../../utils/dialogService';
 
@@ -66,7 +67,8 @@ export const CompanyAccountManager: React.FC<CompanyAccountManagerProps> = ({
     notes: ''
   });
 
-  const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin1';
+  const perms = getRolePermissions(userRole);
+  const isOwnerOrAdmin = perms.canAddAccount;
 
   // Distinct company list (from registered deposit companies and accounts)
   const uniqueCompanies = Array.from(
