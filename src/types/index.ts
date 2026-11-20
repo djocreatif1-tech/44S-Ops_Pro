@@ -3,8 +3,12 @@ export type VehicleStatus = 'active' | 'maintenance' | 'standby' | 'broken';
 export type VehicleType = 
   | 'Dump Truck'
   | 'Truk Box'
+  | 'Truck Kayu'
   | 'Truk Tronton / Wingbox'
   | 'Truk Engkel (CDE/CDD)'
+  | 'Pickup / L300'
+  | 'Pickup Box / L300'
+  | 'Pickup Box /L300'
   | 'Pickup Bak / Blind Van'
   | 'Minibus / HiAce'
   | 'Mobil Operasional Kantor'

@@ -441,11 +441,15 @@ export const VehicleList: React.FC<VehicleListProps> = ({
           <option value="all">Semua Jenis Armada</option>
           <option value="Dump Truck">Dump Truck</option>
           <option value="Truk Box">Truk Box</option>
+          <option value="Truck Kayu">Truck Kayu</option>
           <option value="Truk Tronton / Wingbox">Truk Tronton / Wingbox</option>
-          <option value="Truk Engkel (CDE/CDD)">Truk Engkel</option>
+          <option value="Truk Engkel (CDE/CDD)">Truk Engkel (CDE/CDD)</option>
+          <option value="Pickup / L300">Pickup / L300</option>
+          <option value="Pickup Box / L300">Pickup Box / L300</option>
           <option value="Pickup Bak / Blind Van">Pickup Bak / Blind Van</option>
           <option value="Minibus / HiAce">Minibus / HiAce</option>
-          <option value="Mobil Operasional Kantor">Mobil Operasional</option>
+          <option value="Mobil Operasional Kantor">Mobil Operasional Kantor</option>
+          <option value="Forklift / Alat Berat">Forklift / Alat Berat</option>
         </select>
 
         <select
@@ -899,8 +903,11 @@ export const VehicleList: React.FC<VehicleListProps> = ({
                   >
                     <option value="Dump Truck">Dump Truck</option>
                     <option value="Truk Box">Truk Box</option>
+                    <option value="Truck Kayu">Truck Kayu</option>
                     <option value="Truk Tronton / Wingbox">Truk Tronton / Wingbox</option>
                     <option value="Truk Engkel (CDE/CDD)">Truk Engkel (CDE/CDD)</option>
+                    <option value="Pickup / L300">Pickup / L300</option>
+                    <option value="Pickup Box / L300">Pickup Box / L300</option>
                     <option value="Pickup Bak / Blind Van">Pickup Bak / Blind Van</option>
                     <option value="Minibus / HiAce">Minibus / HiAce</option>
                     <option value="Mobil Operasional Kantor">Mobil Operasional Kantor</option>
