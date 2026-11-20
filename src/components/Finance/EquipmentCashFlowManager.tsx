@@ -39,7 +39,9 @@ import { formatRupiah, formatDateIndo } from '../../utils/formatters';
 import {
   terbilangRupiah,
   printElementById,
-  downloadEquipmentSlipPDF
+  downloadEquipmentSlipPDF,
+  resolveDriverFromData,
+  resolveAdminCashierByRole
 } from '../../utils/slipPrint';
 import { TablePagination } from '../Common/TablePagination';
 import { PrintOutPreviewStage } from '../Common/PrintPreviewControls';
@@ -1364,8 +1366,17 @@ export const EquipmentCashFlowManager: React.FC<EquipmentCashFlowManagerProps> =
                     <div className="col-span-2">
                       <span className="text-slate-500">Diterima Oleh (Karyawan Driver/PIC):</span>{' '}
                       <span className="font-bold">
-                        {printSlipItem.recipientName}
-                        {printSlipItem.recipientNip ? ` [${printSlipItem.recipientNip}]` : ''}
+                        {
+                          resolveDriverFromData({
+                            driverId: printSlipItem.recipientDriverId,
+                            driverName: printSlipItem.recipientName,
+                            driverNip: printSlipItem.recipientNip,
+                            nopol: printSlipItem.nopol,
+                            vehicleId: printSlipItem.vehicleId,
+                            drivers: safeDrivers,
+                            vehicles: safeVehicles
+                          }).labelWithBracket
+                        }
                       </span>
                     </div>
                   )}
@@ -1431,15 +1442,23 @@ export const EquipmentCashFlowManager: React.FC<EquipmentCashFlowManagerProps> =
                     <div className="h-14"></div>
                     <p className="font-bold underline">
                       {printSlipItem.recipientName
-                        ? `${printSlipItem.recipientName}${printSlipItem.recipientNip ? ` (${printSlipItem.recipientNip})` : ''}`
+                        ? resolveDriverFromData({
+                            driverId: printSlipItem.recipientDriverId,
+                            driverName: printSlipItem.recipientName,
+                            driverNip: printSlipItem.recipientNip,
+                            nopol: printSlipItem.nopol,
+                            vehicleId: printSlipItem.vehicleId,
+                            drivers: safeDrivers,
+                            vehicles: safeVehicles
+                          }).labelWithParen
                         : printSlipItem.supplierOrStore || '(.........................)'}
                     </p>
                   </div>
                   <div>
-                    <p className="text-slate-500">Diserahkan Oleh (Logistik / Kasir),</p>
+                    <p className="text-slate-500">Diserahkan Oleh (Logistik / Kasir Pool),</p>
                     <div className="h-14"></div>
                     <p className="font-bold underline">
-                      {printSlipItem.handoverBy || 'Rina Anggraini, S.E.'}
+                      {resolveAdminCashierByRole(printSlipItem.handoverBy, userRole)}
                     </p>
                   </div>
                 </div>

@@ -64,7 +64,10 @@ import { exportFinanceToExcel, exportFinanceToPDF } from '../../utils/exportUtil
 import {
   terbilangRupiah,
   printElementById,
-  downloadFinanceSlipPDF
+  downloadFinanceSlipPDF,
+  resolveDriverFromData,
+  resolveAdminCashierByRole,
+  getAdminCashierSelectOptions
 } from '../../utils/slipPrint';
 import { ModuleFilterExportBar } from '../Common/ModuleFilterExportBar';
 import { getRolePermissions } from '../../utils/permissions';
@@ -2130,16 +2133,19 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] font-semibold text-slate-600 block mb-1">Diserahkan Oleh (Kasir/Staf)</label>
+                      <label className="text-[10px] font-semibold text-slate-600 block mb-1">Diserahkan Oleh (Kasir Pool — Level Role Admin)</label>
                       <input
                         type="text"
                         list="finance-handover-staff-list"
-                        value={formData.handoverBy || ''}
+                        value={formData.handoverBy || resolveAdminCashierByRole('', userRole)}
                         onChange={(e) => setFormData({ ...formData, handoverBy: e.target.value })}
                         placeholder="Petugas Kasir / Keuangan"
                         className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 font-medium"
                       />
                       <datalist id="finance-handover-staff-list">
+                        {getAdminCashierSelectOptions(userRole).map((opt) => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
                         {safeAdminStaff.map((st) => (
                           <option key={st.id} value={st.name}>{st.role} ({st.nip})</option>
                         ))}
@@ -3710,122 +3716,138 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 border-b border-slate-200 pb-3">
-                  <div>
-                    <span className="text-slate-500">Tanggal:</span>{' '}
-                    <span className="font-bold">{formatDateIndo(printSlipTx.date)}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">ID Transaksi:</span>{' '}
-                    <span className="font-bold">{printSlipTx.id}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">
-                      {printSlipTx.type === 'income' ? 'Diterima Dari:' : 'Dibayar Kepada:'}
-                    </span>{' '}
-                    <span className="font-bold">
-                      {printSlipTx.customerOrPayer || printSlipTx.driverName || '-'}
-                      {printSlipTx.driverNip ? ` (${printSlipTx.driverNip})` : ''}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Unit / Nopol:</span>{' '}
-                    <span className="font-bold">{printSlipTx.nopol || 'OPERASIONAL POOL'}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Kategori:</span>{' '}
-                    <span className="font-semibold">{printSlipTx.category}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Kode Trip / Ref:</span>{' '}
-                    <span className="font-semibold">{printSlipTx.tripCode || '-'}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Diserahkan Oleh:</span>{' '}
-                    <span className="font-semibold">{printSlipTx.handoverBy || 'Rina Anggraini, S.E.'}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Diterima Oleh:</span>{' '}
-                    <span className="font-semibold">{printSlipTx.receivedBy || printSlipTx.driverName || '-'}</span>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="text-slate-500">Rekening &amp; Metode:</span>{' '}
-                    <span className="font-bold">
-                      {printSlipTx.accountName || 'Kas Utama'} ({printSlipTx.paymentMethod})
-                    </span>
-                  </div>
-                  {printSlipTx.companyName && (
-                    <div className="col-span-2">
-                      <span className="text-slate-500">Perusahaan / Beban Deposit:</span>{' '}
-                      <span className="font-bold text-indigo-800">{printSlipTx.companyName}</span>
-                    </div>
-                  )}
-                </div>
+                {(() => {
+                  const resolvedSlipDriver = resolveDriverFromData({
+                    driverId: printSlipTx.driverId,
+                    driverName: printSlipTx.driverName,
+                    driverNip: printSlipTx.driverNip,
+                    nopol: printSlipTx.nopol,
+                    vehicleId: printSlipTx.vehicleId,
+                    drivers: safeDrivers,
+                    vehicles
+                  });
+                  const resolvedSlipCashier = resolveAdminCashierByRole(
+                    printSlipTx.handoverBy,
+                    userRole
+                  );
 
-                <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1">
-                  <div className="text-[10px] font-bold text-slate-500 uppercase">
-                    Untuk Pembayaran / Keterangan:
-                  </div>
-                  <p className="text-xs text-slate-800 leading-relaxed font-sans">
-                    {printSlipTx.description || '-'}
-                  </p>
-                </div>
+                  return (
+                    <>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 border-b border-slate-200 pb-3">
+                        <div>
+                          <span className="text-slate-500">Tanggal:</span>{' '}
+                          <span className="font-bold">{formatDateIndo(printSlipTx.date)}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">ID Transaksi:</span>{' '}
+                          <span className="font-bold">{printSlipTx.id}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">
+                            {printSlipTx.type === 'income' ? 'Diterima Dari:' : 'Dibayar Kepada:'}
+                          </span>{' '}
+                          <span className="font-bold">
+                            {printSlipTx.customerOrPayer || resolvedSlipDriver.labelWithParen || '-'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Unit / Nopol:</span>{' '}
+                          <span className="font-bold">{printSlipTx.nopol || 'OPERASIONAL POOL'}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Kategori:</span>{' '}
+                          <span className="font-semibold">{printSlipTx.category}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Kode Trip / Ref:</span>{' '}
+                          <span className="font-semibold">{printSlipTx.tripCode || '-'}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Diserahkan Oleh:</span>{' '}
+                          <span className="font-semibold">{resolvedSlipCashier}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Diterima Oleh:</span>{' '}
+                          <span className="font-semibold">{printSlipTx.receivedBy || resolvedSlipDriver.name || '-'}</span>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-slate-500">Rekening &amp; Metode:</span>{' '}
+                          <span className="font-bold">
+                            {printSlipTx.accountName || 'Kas Utama'} ({printSlipTx.paymentMethod})
+                          </span>
+                        </div>
+                        {printSlipTx.companyName && (
+                          <div className="col-span-2">
+                            <span className="text-slate-500">Perusahaan / Beban Deposit:</span>{' '}
+                            <span className="font-bold text-indigo-800">{printSlipTx.companyName}</span>
+                          </div>
+                        )}
+                      </div>
 
-                <div
-                  className={`p-3.5 rounded-xl border-2 space-y-1.5 ${
-                    printSlipTx.type === 'income'
-                      ? 'bg-emerald-50/60 border-emerald-700'
-                      : 'bg-rose-50/50 border-rose-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-bold uppercase text-slate-700">
-                      JUMLAH NOMINAL:
-                    </span>
-                    <span
-                      className={`text-lg font-black ${
-                        printSlipTx.type === 'income' ? 'text-emerald-800' : 'text-rose-800'
-                      }`}
-                    >
-                      {printSlipTx.type === 'income' ? '+' : '-'} {formatRupiah(printSlipTx.amount)}
-                    </span>
-                  </div>
-                  <div className="text-[11px] italic text-slate-700 border-t border-slate-300/70 pt-1.5">
-                    Terbilang: <span className="font-bold"># {terbilangRupiah(printSlipTx.amount)} #</span>
-                  </div>
-                </div>
+                      <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1">
+                        <div className="text-[10px] font-bold text-slate-500 uppercase">
+                          Untuk Pembayaran / Keterangan:
+                        </div>
+                        <p className="text-xs text-slate-800 leading-relaxed font-sans">
+                          {printSlipTx.description || '-'}
+                        </p>
+                      </div>
 
-                <div className="flex items-center justify-between text-[10px] border-b border-slate-200 pb-2">
-                  <span>
-                    Status Dokumen:{' '}
-                    <strong className="uppercase">
-                      {printSlipTx.isReceiptVerified
-                        ? `LULUS AUDIT (${printSlipTx.receiptVerifiedBy || 'Tim Audit'})`
-                        : printSlipTx.status}
-                    </strong>
-                  </span>
-                  <span>Nota Fisik: {printSlipTx.receiptProofUrl ? 'TERLAMPIR' : 'BELUM DILAMPIRKAN'}</span>
-                </div>
+                      <div
+                        className={`p-3.5 rounded-xl border-2 space-y-1.5 ${
+                          printSlipTx.type === 'income'
+                            ? 'bg-emerald-50/60 border-emerald-700'
+                            : 'bg-rose-50/50 border-rose-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] font-bold uppercase text-slate-700">
+                            JUMLAH NOMINAL:
+                          </span>
+                          <span
+                            className={`text-lg font-black ${
+                              printSlipTx.type === 'income' ? 'text-emerald-800' : 'text-rose-800'
+                            }`}
+                          >
+                            {printSlipTx.type === 'income' ? '+' : '-'} {formatRupiah(printSlipTx.amount)}
+                          </span>
+                        </div>
+                        <div className="text-[11px] italic text-slate-700 border-t border-slate-300/70 pt-1.5">
+                          Terbilang: <span className="font-bold"># {terbilangRupiah(printSlipTx.amount)} #</span>
+                        </div>
+                      </div>
 
-                <div className="grid grid-cols-2 pt-3 text-center text-xs">
-                  <div>
-                    <p className="text-slate-500">
-                      {printSlipTx.type === 'income' ? 'Penyetor / Pihak Terkait,' : 'Diterima Oleh (Driver / PIC),'}
-                    </p>
-                    <div className="h-14"></div>
-                    <p className="font-bold underline">
-                      {printSlipTx.receivedBy || printSlipTx.customerOrPayer || printSlipTx.driverName || '(.........................)'}
-                    </p>
-                    {printSlipTx.driverNip && (
-                      <p className="text-[10px] text-slate-500">NIP: {printSlipTx.driverNip}</p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-slate-500">Diserahkan Oleh (Kasir / Keuangan),</p>
-                    <div className="h-14"></div>
-                    <p className="font-bold underline">{printSlipTx.handoverBy || 'Rina Anggraini, S.E.'}</p>
-                  </div>
-                </div>
+                      <div className="flex items-center justify-between text-[10px] border-b border-slate-200 pb-2">
+                        <span>
+                          Status Dokumen:{' '}
+                          <strong className="uppercase">
+                            {printSlipTx.isReceiptVerified
+                              ? `LULUS AUDIT (${printSlipTx.receiptVerifiedBy || 'Tim Audit'})`
+                              : printSlipTx.status}
+                          </strong>
+                        </span>
+                        <span>Nota Fisik: {printSlipTx.receiptProofUrl ? 'TERLAMPIR' : 'BELUM DILAMPIRKAN'}</span>
+                      </div>
+
+                      <div className="grid grid-cols-2 pt-3 text-center text-xs">
+                        <div>
+                          <p className="text-slate-500">
+                            {printSlipTx.type === 'income' ? 'Penyetor / Pihak Terkait,' : 'Diterima Oleh (Karyawan Driver),'}
+                          </p>
+                          <div className="h-14"></div>
+                          <p className="font-bold underline">
+                            {printSlipTx.customerOrPayer || resolvedSlipDriver.labelWithParen || '(.........................)'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-slate-500">Diserahkan Oleh (Kasir Pool),</p>
+                          <div className="h-14"></div>
+                          <p className="font-bold underline">{resolvedSlipCashier}</p>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
 
                 <div className="text-[9px] text-center text-slate-400 pt-2 border-t border-slate-100">
                   Dicetak melalui 44S Ops_pro • Slip Kwitansi Sah Keuangan Armada

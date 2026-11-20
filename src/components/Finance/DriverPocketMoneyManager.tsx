@@ -42,7 +42,10 @@ import { formatRupiah, formatDateIndo } from '../../utils/formatters';
 import {
   terbilangRupiah,
   printElementById,
-  downloadPocketSlipPDF
+  downloadPocketSlipPDF,
+  resolveDriverFromData,
+  resolveAdminCashierByRole,
+  getAdminCashierSelectOptions
 } from '../../utils/slipPrint';
 import { TablePagination } from '../Common/TablePagination';
 import { ReceiptUploadField } from '../Common/ReceiptUploadField';
@@ -107,16 +110,26 @@ export const DriverPocketMoneyManager: React.FC<DriverPocketMoneyManagerProps> =
   const [receiptZoom, setReceiptZoom] = useState(1);
   const [formError, setFormError] = useState<string | null>(null);
 
+  const defaultResolvedDriver = resolveDriverFromData({
+    drivers: safeDrivers,
+    vehicles: safeVehicles
+  });
+  const defaultResolvedCashier = resolveAdminCashierByRole('', userRole);
+  const adminCashierOptions = useMemo(
+    () => getAdminCashierSelectOptions(userRole),
+    [userRole]
+  );
+
   // Form State: Add Pocket Flow
   const [formData, setFormData] = useState<Partial<DriverPocketCashFlow>>({
     date: new Date().toISOString().slice(0, 10),
     tripCode: 'TS-' + new Date().toISOString().slice(0, 7).replace('-', '') + '-01',
-    driverId: safeDrivers[0]?.id || 'DRV-001',
-    driverNip: safeDrivers[0]?.nip || 'DRV-EMP-2020-001',
-    driverName: safeDrivers[0]?.name || safeVehicles[0]?.assignedDriver || 'Bambang Sudiro',
-    driverPhone: safeDrivers[0]?.phone || '0812-8871-9921',
-    helperName: safeDrivers[0]?.helperName || 'Ujang',
-    disbursedBy: safeAdminStaff[0]?.name || 'Rina Anggraini, S.E.',
+    driverId: defaultResolvedDriver.id,
+    driverNip: defaultResolvedDriver.nip,
+    driverName: defaultResolvedDriver.name,
+    driverPhone: defaultResolvedDriver.phone,
+    helperName: defaultResolvedDriver.helperName,
+    disbursedBy: defaultResolvedCashier,
     vehicleId: safeVehicles[0]?.id || '',
     originLocation: 'Quarry Rumpin, Bogor',
     destinationLocation: 'Batching Plant Puri Indah, Jakbar',
@@ -258,7 +271,13 @@ export const DriverPocketMoneyManager: React.FC<DriverPocketMoneyManagerProps> =
   const handleOpenAdd = () => {
     setSelectedFlow(null);
     const initialVeh = safeVehicles[0];
-    const initialDriver = safeDrivers[0];
+    const resolvedDrv = resolveDriverFromData({
+      nopol: initialVeh?.nopol,
+      vehicleId: initialVeh?.id,
+      drivers: safeDrivers,
+      vehicles: safeVehicles
+    });
+    const resolvedCashier = resolveAdminCashierByRole('', userRole);
     const targetComp = initialVeh?.ownerCompany || 'PT Transindo Logistik';
     
     // Temukan akun kas default berdasarkan perusahaan kendaraan atau akun pertama
@@ -268,12 +287,12 @@ export const DriverPocketMoneyManager: React.FC<DriverPocketMoneyManagerProps> =
     const def: Partial<DriverPocketCashFlow> = {
       date: new Date().toISOString().slice(0, 10),
       tripCode: 'TS-' + new Date().toISOString().slice(0, 7).replace('-', '') + '-' + Date.now().toString().slice(-3),
-      driverId: initialDriver?.id || 'DRV-001',
-      driverNip: initialDriver?.nip || 'DRV-EMP-2020-001',
-      driverName: initialDriver?.name || initialVeh?.assignedDriver || 'Supir Armada',
-      driverPhone: initialDriver?.phone || initialVeh?.driverPhone || '',
-      helperName: initialDriver?.helperName || '',
-      disbursedBy: safeAdminStaff[0] ? `${safeAdminStaff[0].name} (${safeAdminStaff[0].jobTitle})` : 'Rina Anggraini, S.E. (Kasir Pool)',
+      driverId: resolvedDrv.id,
+      driverNip: resolvedDrv.nip,
+      driverName: resolvedDrv.name,
+      driverPhone: resolvedDrv.phone,
+      helperName: resolvedDrv.helperName,
+      disbursedBy: resolvedCashier,
       vehicleId: initialVeh?.id || '',
       originLocation: 'Pool Utama',
       destinationLocation: 'Lokasi Klien',
@@ -345,7 +364,7 @@ export const DriverPocketMoneyManager: React.FC<DriverPocketMoneyManagerProps> =
       driverName: formData.driverName.trim(),
       driverPhone: formData.driverPhone || matchedDriver?.phone || '',
       helperName: formData.helperName || '',
-      disbursedBy: formData.disbursedBy || 'Rina Anggraini, S.E. (Kasir Pool)',
+      disbursedBy: resolveAdminCashierByRole(formData.disbursedBy, userRole),
       receivedBy: formData.driverName.trim(),
       vehicleId: formData.vehicleId || safeVehicles[0]?.id || '',
       nopol,
@@ -708,8 +727,21 @@ export const DriverPocketMoneyManager: React.FC<DriverPocketMoneyManagerProps> =
                     refunded: 'Sisa Disetor'
                   }[flow.status || 'disbursed'];
 
-                  const matchedDrv = safeDrivers.find((d) => d.name === flow.driverName || d.id === flow.driverId);
-                  const displayNip = flow.driverNip || matchedDrv?.nip;
+                  const resolvedRowDriver = resolveDriverFromData({
+                    driverId: flow.driverId,
+                    driverName: flow.driverName,
+                    driverNip: flow.driverNip,
+                    helperName: flow.helperName,
+                    nopol: flow.nopol,
+                    vehicleId: flow.vehicleId,
+                    drivers: safeDrivers,
+                    vehicles: safeVehicles
+                  });
+                  const resolvedRowCashier = resolveAdminCashierByRole(
+                    flow.disbursedBy,
+                    userRole
+                  );
+                  const displayNip = resolvedRowDriver.nip;
 
                   return (
                     <tr key={flow.id} className="hover:bg-emerald-50/20 transition duration-150">
@@ -726,20 +758,18 @@ export const DriverPocketMoneyManager: React.FC<DriverPocketMoneyManagerProps> =
                         )}
                         <div className="font-bold text-slate-900 flex items-center gap-1.5">
                           <Users className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                          <span>{flow.driverName}</span>
+                          <span>{resolvedRowDriver.name}</span>
                         </div>
-                        {flow.helperName ? (
+                        {resolvedRowDriver.helperName ? (
                           <div className="text-[10px] text-slate-500 mt-0.5">
-                            Kernet: <span className="font-semibold">{flow.helperName}</span>
+                            Kernet: <span className="font-semibold">{resolvedRowDriver.helperName}</span>
                           </div>
                         ) : (
                           <div className="text-[10px] text-slate-400 mt-0.5">Tanpa kernet</div>
                         )}
-                        {flow.disbursedBy && (
-                          <div className="text-[10px] text-emerald-700 font-medium mt-0.5">
-                            Diserahkan: {flow.disbursedBy}
-                          </div>
-                        )}
+                        <div className="text-[10px] text-emerald-700 font-medium mt-0.5">
+                          Kasir Pool: {resolvedRowCashier}
+                        </div>
                       </td>
 
                       <td className="py-3 px-4">
@@ -970,32 +1000,42 @@ export const DriverPocketMoneyManager: React.FC<DriverPocketMoneyManagerProps> =
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                      Karyawan Driver Penerima (Supir Utama) *
+                      Karyawan Driver Penerima (Dari Data Driver) *
                     </label>
                     <select
                       value={formData.driverName}
                       onChange={(e) => {
                         const d = safeDrivers.find((item) => item.name === e.target.value);
                         const matchedVeh = safeVehicles.find(
-                          (v) => v.nopol === d?.assignedVehicle || v.assignedDriver === d?.name
+                          (v) => v.nopol === d?.assignedVehicle || v.assignedDriver === e.target.value
                         );
                         setFormData({
                           ...formData,
                           driverId: d?.id || '',
                           driverNip: d?.nip || '',
                           driverName: e.target.value,
-                          driverPhone: d?.phone || formData.driverPhone,
+                          driverPhone: d?.phone || matchedVeh?.driverPhone || formData.driverPhone,
                           helperName: d?.helperName || formData.helperName,
                           vehicleId: matchedVeh?.id || formData.vehicleId
                         });
                       }}
                       className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-hidden focus:border-emerald-500 bg-white font-semibold"
                     >
-                      {safeDrivers.map((d) => (
-                        <option key={d.id} value={d.name}>
-                          [{d.nip || d.id}] {d.name} ({d.simType})
-                        </option>
-                      ))}
+                      {safeDrivers.length > 0 ? (
+                        safeDrivers.map((d) => (
+                          <option key={d.id} value={d.name}>
+                            {d.nip ? `[${d.nip}] ` : ''}{d.name}{d.simType ? ` (SIM ${d.simType})` : ''}
+                          </option>
+                        ))
+                      ) : (
+                        safeVehicles
+                          .filter((v) => v.assignedDriver && v.assignedDriver !== '-')
+                          .map((v) => (
+                            <option key={v.id} value={v.assignedDriver}>
+                              {v.assignedDriver} ({v.nopol})
+                            </option>
+                          ))
+                      )}
                     </select>
                   </div>
 
@@ -1017,9 +1057,6 @@ export const DriverPocketMoneyManager: React.FC<DriverPocketMoneyManagerProps> =
                           [{d.nip || d.id}] {d.jobTitle || d.simType}
                         </option>
                       ))}
-                      <option value="Ujang (Kernet)" />
-                      <option value="Tono (Kernet)" />
-                      <option value="Slamet (Kernet)" />
                     </datalist>
                   </div>
                 </div>
@@ -1050,16 +1087,18 @@ export const DriverPocketMoneyManager: React.FC<DriverPocketMoneyManagerProps> =
 
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                    Diserahkan Oleh (Petugas Kasir / Keuangan Pool) *
+                    Diserahkan Oleh (Kasir Pool — Berdasarkan Nama &amp; Level Role Admin) *
                   </label>
                   <select
-                    value={formData.disbursedBy || 'Rina Anggraini, S.E. (Kasir Pool)'}
+                    value={resolveAdminCashierByRole(formData.disbursedBy, userRole)}
                     onChange={(e) => setFormData({ ...formData, disbursedBy: e.target.value })}
                     className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white font-medium"
                   >
-                    <option value="Rina Anggraini, S.E. (Kasir Pool)">
-                      [ADM-2023-001] Rina Anggraini, S.E. (Kepala Administrasi &amp; Keuangan)
-                    </option>
+                    {adminCashierOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
                     {safeAdminStaff.map((s) => (
                       <option key={s.id} value={`${s.name} (${s.jobTitle})`}>
                         [{s.nikOrNip}] {s.name} ({s.jobTitle})
@@ -1634,134 +1673,150 @@ export const DriverPocketMoneyManager: React.FC<DriverPocketMoneyManagerProps> =
             <PrintOutPreviewStage
               documentLabel={`SLIP UANG SAKU: ${selectedFlow.id} / ${selectedFlow.tripCode}`}
             >
-              {/* Printable Content */}
-              <div id="printable-pocket-slip" className="p-6 bg-white space-y-4 font-mono text-slate-900">
-                <div className="border-b-2 border-slate-900 pb-3 text-center">
-                  <h3 className="text-sm font-black uppercase tracking-wide">
-                    {selectedFlow.sourceCompanyName || selectedFlow.ownerCompany || 'PT TRANSINDO LOGISTIK INDONESIA'}
-                  </h3>
-                  <p className="text-[10px] text-slate-600">
-                    SLIP BUKTI PENCAIRAN UANG SAKU &amp; SERAH TERIMA KAS PENGEMUDI
-                  </p>
-                  <div className="mt-1 font-bold text-xs">
-                    NO. VOUCHER: {selectedFlow.id} / {selectedFlow.tripCode}
-                  </div>
-                </div>
+              {(() => {
+                const resolvedSlipDriver = resolveDriverFromData({
+                  driverId: selectedFlow.driverId,
+                  driverName: selectedFlow.driverName,
+                  driverNip: selectedFlow.driverNip,
+                  helperName: selectedFlow.helperName,
+                  nopol: selectedFlow.nopol,
+                  vehicleId: selectedFlow.vehicleId,
+                  drivers: safeDrivers,
+                  vehicles: safeVehicles
+                });
+                const resolvedSlipCashier = resolveAdminCashierByRole(
+                  selectedFlow.disbursedBy,
+                  userRole
+                );
 
-                <div className="grid grid-cols-2 text-xs gap-y-1.5 border-b border-slate-200 pb-3">
-                  <div>
-                    <span className="text-slate-500">Tanggal:</span> {formatDateIndo(selectedFlow.date)}
-                  </div>
-                  <div>
-                    <span className="text-slate-500">No. Polisi:</span> {selectedFlow.nopol}
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Karyawan Driver:</span>{' '}
-                    <span className="font-bold">
-                      {selectedFlow.driverName}
-                      {selectedFlow.driverNip ? ` [${selectedFlow.driverNip}]` : ''}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Kernet:</span> {selectedFlow.helperName || '-'}
-                  </div>
-                  <div className="col-span-2">
-                    <span className="text-slate-500">Rute:</span> {selectedFlow.originLocation} → {selectedFlow.destinationLocation}
-                  </div>
-                  <div className="col-span-2 text-slate-700">
-                    <span className="text-slate-500">Sumber Kas:</span>{' '}
-                    <span className="font-bold">{selectedFlow.sourceCompanyName || selectedFlow.ownerCompany || 'Fleet'}</span> - {selectedFlow.accountName} ({selectedFlow.paymentMethod})
-                  </div>
-                </div>
+                return (
+                  <div id="printable-pocket-slip" className="p-6 bg-white space-y-4 font-mono text-slate-900">
+                    <div className="border-b-2 border-slate-900 pb-3 text-center">
+                      <h3 className="text-sm font-black uppercase tracking-wide">
+                        {selectedFlow.sourceCompanyName || selectedFlow.ownerCompany || 'PT TRANSINDO LOGISTIK INDONESIA'}
+                      </h3>
+                      <p className="text-[10px] text-slate-600">
+                        SLIP BUKTI PENCAIRAN UANG SAKU &amp; SERAH TERIMA KAS PENGEMUDI
+                      </p>
+                      <div className="mt-1 font-bold text-xs">
+                        NO. VOUCHER: {selectedFlow.id} / {selectedFlow.tripCode}
+                      </div>
+                    </div>
 
-                <div className="space-y-1 text-xs border-b border-slate-200 pb-3">
-                  <div className="font-bold mb-1">Rincian Komponen Saku Diberikan:</div>
-                  <div className="flex justify-between">
-                    <span>1. Uang Makan &amp; Saku Supir:</span>
-                    <span>{formatRupiah(selectedFlow.driverAllowance)}</span>
-                  </div>
-                  {selectedFlow.helperAllowance > 0 && (
-                    <div className="flex justify-between">
-                      <span>2. Uang Saku Kernet:</span>
-                      <span>{formatRupiah(selectedFlow.helperAllowance)}</span>
+                    <div className="grid grid-cols-2 text-xs gap-y-1.5 border-b border-slate-200 pb-3">
+                      <div>
+                        <span className="text-slate-500">Tanggal:</span> {formatDateIndo(selectedFlow.date)}
+                      </div>
+                      <div>
+                        <span className="text-slate-500">No. Polisi:</span> {selectedFlow.nopol}
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Karyawan Driver:</span>{' '}
+                        <span className="font-bold">
+                          {resolvedSlipDriver.labelWithBracket}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Kernet:</span> {resolvedSlipDriver.helperName || '-'}
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-slate-500">Rute:</span> {selectedFlow.originLocation} → {selectedFlow.destinationLocation}
+                      </div>
+                      <div className="col-span-2 text-slate-700">
+                        <span className="text-slate-500">Sumber Kas:</span>{' '}
+                        <span className="font-bold">{selectedFlow.sourceCompanyName || selectedFlow.ownerCompany || 'Fleet'}</span> - {selectedFlow.accountName} ({selectedFlow.paymentMethod})
+                      </div>
                     </div>
-                  )}
-                  {selectedFlow.tollAllowance > 0 && (
-                    <div className="flex justify-between">
-                      <span>3. Alokasi Biaya E-Toll:</span>
-                      <span>{formatRupiah(selectedFlow.tollAllowance)}</span>
-                    </div>
-                  )}
-                  {selectedFlow.fuelAllowance > 0 && (
-                    <div className="flex justify-between">
-                      <span>4. Alokasi BBM Solar Jalan:</span>
-                      <span>{formatRupiah(selectedFlow.fuelAllowance)}</span>
-                    </div>
-                  )}
-                  {selectedFlow.parkingAndWeighCost > 0 && (
-                    <div className="flex justify-between">
-                      <span>5. Parkir, Retribusi &amp; Timbangan:</span>
-                      <span>{formatRupiah(selectedFlow.parkingAndWeighCost)}</span>
-                    </div>
-                  )}
-                  {selectedFlow.loadingUnloadingCost > 0 && (
-                    <div className="flex justify-between">
-                      <span>6. Ongkos Bongkar Muat:</span>
-                      <span>{formatRupiah(selectedFlow.loadingUnloadingCost)}</span>
-                    </div>
-                  )}
-                  {selectedFlow.emergencyFund > 0 && (
-                    <div className="flex justify-between">
-                      <span>7. Cadangan Darurat:</span>
-                      <span>{formatRupiah(selectedFlow.emergencyFund)}</span>
-                    </div>
-                  )}
-                </div>
 
-                <div className="border-b-2 border-slate-900 pb-2.5 space-y-1">
-                  <div className="flex justify-between text-sm font-black">
-                    <span>TOTAL UANG SAKU DIBAYAR:</span>
-                    <span className="text-base">{formatRupiah(selectedFlow.totalGiven)}</span>
-                  </div>
-                  <div className="text-[11px] italic text-slate-700">
-                    Terbilang: <span className="font-bold"># {terbilangRupiah(selectedFlow.totalGiven)} #</span>
-                  </div>
-                </div>
-
-                {selectedFlow.actualExpense > 0 && (
-                  <div className="text-xs bg-slate-50 p-2 rounded-lg border border-slate-200 space-y-1">
-                    <div className="flex justify-between font-bold">
-                      <span>Realisasi Pengeluaran Lapangan:</span>
-                      <span>{formatRupiah(selectedFlow.actualExpense)}</span>
+                    <div className="space-y-1 text-xs border-b border-slate-200 pb-3">
+                      <div className="font-bold mb-1">Rincian Komponen Saku Diberikan:</div>
+                      <div className="flex justify-between">
+                        <span>1. Uang Makan &amp; Saku Supir:</span>
+                        <span>{formatRupiah(selectedFlow.driverAllowance)}</span>
+                      </div>
+                      {selectedFlow.helperAllowance > 0 && (
+                        <div className="flex justify-between">
+                          <span>2. Uang Saku Kernet:</span>
+                          <span>{formatRupiah(selectedFlow.helperAllowance)}</span>
+                        </div>
+                      )}
+                      {selectedFlow.tollAllowance > 0 && (
+                        <div className="flex justify-between">
+                          <span>3. Alokasi Biaya E-Toll:</span>
+                          <span>{formatRupiah(selectedFlow.tollAllowance)}</span>
+                        </div>
+                      )}
+                      {selectedFlow.fuelAllowance > 0 && (
+                        <div className="flex justify-between">
+                          <span>4. Alokasi BBM Solar Jalan:</span>
+                          <span>{formatRupiah(selectedFlow.fuelAllowance)}</span>
+                        </div>
+                      )}
+                      {selectedFlow.parkingAndWeighCost > 0 && (
+                        <div className="flex justify-between">
+                          <span>5. Parkir, Retribusi &amp; Timbangan:</span>
+                          <span>{formatRupiah(selectedFlow.parkingAndWeighCost)}</span>
+                        </div>
+                      )}
+                      {selectedFlow.loadingUnloadingCost > 0 && (
+                        <div className="flex justify-between">
+                          <span>6. Ongkos Bongkar Muat:</span>
+                          <span>{formatRupiah(selectedFlow.loadingUnloadingCost)}</span>
+                        </div>
+                      )}
+                      {selectedFlow.emergencyFund > 0 && (
+                        <div className="flex justify-between">
+                          <span>7. Cadangan Darurat:</span>
+                          <span>{formatRupiah(selectedFlow.emergencyFund)}</span>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex justify-between font-black text-emerald-700">
-                      <span>Sisa Disetor ke Kas:</span>
-                      <span>{formatRupiah(selectedFlow.remainingBalance)}</span>
+
+                    <div className="border-b-2 border-slate-900 pb-2.5 space-y-1">
+                      <div className="flex justify-between text-sm font-black">
+                        <span>TOTAL UANG SAKU DIBAYAR:</span>
+                        <span className="text-base">{formatRupiah(selectedFlow.totalGiven)}</span>
+                      </div>
+                      <div className="text-[11px] italic text-slate-700">
+                        Terbilang: <span className="font-bold"># {terbilangRupiah(selectedFlow.totalGiven)} #</span>
+                      </div>
+                    </div>
+
+                    {selectedFlow.actualExpense > 0 && (
+                      <div className="text-xs bg-slate-50 p-2 rounded-lg border border-slate-200 space-y-1">
+                        <div className="flex justify-between font-bold">
+                          <span>Realisasi Pengeluaran Lapangan:</span>
+                          <span>{formatRupiah(selectedFlow.actualExpense)}</span>
+                        </div>
+                        <div className="flex justify-between font-black text-emerald-700">
+                          <span>Sisa Disetor ke Kas:</span>
+                          <span>{formatRupiah(selectedFlow.remainingBalance)}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tanda Tangan */}
+                    <div className="grid grid-cols-2 pt-4 text-center text-xs">
+                      <div>
+                        <p className="text-slate-500">Diterima Oleh (Karyawan Driver),</p>
+                        <div className="h-14"></div>
+                        <p className="font-bold underline">
+                          {resolvedSlipDriver.labelWithParen}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">Diserahkan Oleh (Kasir Pool),</p>
+                        <div className="h-14"></div>
+                        <p className="font-bold underline">{resolvedSlipCashier}</p>
+                      </div>
+                    </div>
+
+                    <div className="text-[9px] text-center text-slate-400 pt-2 border-t border-slate-100">
+                      Dicetak via FleetOps Pro • Wajib lampirkan struk nota saat tiba kembali di pool
                     </div>
                   </div>
-                )}
-
-                {/* Tanda Tangan */}
-                <div className="grid grid-cols-2 pt-4 text-center text-xs">
-                  <div>
-                    <p className="text-slate-500">Diterima Oleh (Karyawan Driver),</p>
-                    <div className="h-14"></div>
-                    <p className="font-bold underline">
-                      {selectedFlow.driverName}
-                      {selectedFlow.driverNip ? ` (${selectedFlow.driverNip})` : ''}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500">Diserahkan Oleh (Kasir Pool),</p>
-                    <div className="h-14"></div>
-                    <p className="font-bold underline">{selectedFlow.disbursedBy || 'Rina Anggraini, S.E.'}</p>
-                  </div>
-                </div>
-
-                <div className="text-[9px] text-center text-slate-400 pt-2 border-t border-slate-100">
-                  Dicetak via FleetOps Pro • Wajib lampirkan struk nota saat tiba kembali di pool
-                </div>
-              </div>
+                );
+              })()}
             </PrintOutPreviewStage>
           </div>
         </div>

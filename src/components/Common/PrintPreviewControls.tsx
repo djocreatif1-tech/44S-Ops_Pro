@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Printer,
   Copy,
@@ -9,7 +9,9 @@ import {
   X,
   FileDown,
   FileText,
-  Maximize2
+  Maximize2,
+  ExternalLink,
+  Receipt
 } from 'lucide-react';
 import {
   PRINTER_TYPE_OPTIONS,
@@ -22,7 +24,8 @@ import {
   getStoredPrintPreferences,
   saveStoredPrintPreferences,
   executeHardwarePrint,
-  exportElementTextToFormattedPDF
+  exportElementTextToFormattedPDF,
+  openAboutBlankPrintPreview
 } from '../../utils/slipPrint';
 
 interface PrintOutPreviewStageProps {
@@ -32,8 +35,8 @@ interface PrintOutPreviewStageProps {
 }
 
 /**
- * Menampilkan isi slip secara bersih (tanpa toolbar tambahan di modal awal),
- * dan membuka Jendela Print Preview & Pilih Printer ketika tombol "Cetak Printer" diklik.
+ * Menampilkan toolbar pilihan Jenis Kertas (Kertas Biasa A4/A5 vs Kertas Thermal 80mm/58mm),
+ * pratinjau ukuran kertas secara langsung, serta tombol Print Preview (about:blank).
  */
 export const PrintOutPreviewStage: React.FC<PrintOutPreviewStageProps> = ({
   children,
@@ -49,6 +52,7 @@ export const PrintOutPreviewStage: React.FC<PrintOutPreviewStageProps> = ({
   const [printStatusMessage, setPrintStatusMessage] = useState<string | null>(
     null
   );
+  const stageWrapperRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     saveStoredPrintPreferences(prefs);
@@ -114,6 +118,19 @@ export const PrintOutPreviewStage: React.FC<PrintOutPreviewStageProps> = ({
     }));
   };
 
+  const resolveChildPrintableId = (): string | null => {
+    if (previewTarget?.elementId) return previewTarget.elementId;
+    if (!stageWrapperRef.current) return null;
+    const childWithId = stageWrapperRef.current.querySelector('[id]');
+    return childWithId ? childWithId.id : null;
+  };
+
+  const handleOpenAboutBlankDirect = () => {
+    const targetId = resolveChildPrintableId();
+    if (!targetId) return;
+    openAboutBlankPrintPreview(targetId, documentLabel, prefs);
+  };
+
   const handleConfirmPrint = () => {
     if (!previewTarget) return;
 
@@ -130,10 +147,9 @@ export const PrintOutPreviewStage: React.FC<PrintOutPreviewStageProps> = ({
     }
 
     setPrintStatusMessage(
-      `Mengirim dokumen (${prefs.copies} rangkap) ke ${prefs.deviceName}...`
+      `Membuka Print Preview (about:blank) untuk ${prefs.deviceName}...`
     );
 
-    // Panggil print sinkron langsung dari event klik tombol
     executeHardwarePrint(
       previewTarget.elementId,
       previewTarget.documentTitle,
@@ -142,15 +158,101 @@ export const PrintOutPreviewStage: React.FC<PrintOutPreviewStageProps> = ({
   };
 
   const isThermal = Boolean(activePrinterConfig.isThermal);
+  const isThermal58 = prefs.printerType === 'thermal_58';
   const isDotMatrix = Boolean(activePrinterConfig.isDotMatrix);
   const isBW = prefs.colorMode === 'bw' || isDotMatrix || isThermal;
 
   return (
     <>
-      {/* Tampilkan isi slip asli secara bersih tanpa bar tambahan */}
-      {children}
+      {/* Bar Pemilihan Jenis Kertas (Biasa vs Thermal) & Print Preview about:blank */}
+      <div className="px-4 py-2.5 bg-slate-900 text-slate-100 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs print:hidden print-hide">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[11px] font-bold text-slate-300 mr-1">
+            Jenis Kertas:
+          </span>
+          <button
+            type="button"
+            onClick={() =>
+              handleSelectPrinterType(
+                prefs.printerType === 'laser_a4' ? 'laser_a4' : 'laser_a5'
+              )
+            }
+            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition ${
+              !isThermal
+                ? 'bg-blue-600 text-white shadow-2xs'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Kertas Biasa (A4 / A5)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              handleSelectPrinterType(
+                prefs.printerType === 'thermal_58' ? 'thermal_58' : 'thermal_80'
+              )
+            }
+            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition ${
+              isThermal
+                ? 'bg-emerald-600 text-white shadow-2xs'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            <Receipt className="w-3.5 h-3.5" />
+            <span>Kertas Thermal (80mm / 58mm)</span>
+          </button>
 
-      {/* Modal Jendela Print Preview (Muncul saat tombol "Cetak Printer" diklik) */}
+          <select
+            value={prefs.printerType}
+            onChange={(e) =>
+              handleSelectPrinterType(e.target.value as PrinterTypeId)
+            }
+            className="bg-slate-800 border border-slate-700 text-slate-100 rounded-lg px-2 py-1 text-[11px] font-semibold focus:outline-hidden focus:border-blue-500"
+            title="Pilih ukuran kertas spesifik"
+          >
+            <option value="laser_a5">Kertas Biasa — Kwitansi A5</option>
+            <option value="laser_a4">Kertas Biasa — Dokumen A4</option>
+            <option value="dot_matrix">Kertas Biasa — Continuous Form NCR</option>
+            <option value="thermal_80">Kertas Thermal — Struk Roll 80mm</option>
+            <option value="thermal_58">Kertas Thermal — Struk Roll 58mm</option>
+          </select>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleOpenAboutBlankDirect}
+          className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[11px] font-bold flex items-center gap-1.5 shadow-2xs transition"
+          title="Buka jendela Print Preview di tab about:blank"
+        >
+          <ExternalLink className="w-3.5 h-3.5" />
+          <span>Print Preview (about:blank)</span>
+        </button>
+      </div>
+
+      {/* Area Pratinjau Slip Sesuai Jenis Kertas (Thermal vs Kertas Biasa) */}
+      <div
+        ref={stageWrapperRef}
+        className={
+          isThermal
+            ? 'bg-slate-200/80 py-4 px-2 flex justify-center overflow-x-auto'
+            : ''
+        }
+      >
+        <div
+          className={
+            isThermal58
+              ? 'w-full max-w-[265px] bg-white shadow-lg border-y-2 border-dashed border-slate-400 text-[10px] leading-snug'
+              : isThermal
+              ? 'w-full max-w-[340px] bg-white shadow-lg border-y-2 border-dashed border-slate-400 text-[11px] leading-snug'
+              : 'w-full'
+          }
+        >
+          {children}
+        </div>
+      </div>
+
+      {/* Modal Jendela Print Preview (Muncul bila popup about:blank diblokir atau untuk kustomisasi lanjutan) */}
       {previewTarget && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/75 backdrop-blur-xs p-2 sm:p-4 print:hidden print-hide">
           <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] max-h-[760px] flex flex-col md:flex-row overflow-hidden animate-in fade-in zoom-in-95 duration-150">

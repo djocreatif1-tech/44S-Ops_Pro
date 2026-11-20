@@ -649,21 +649,7 @@ export const saveStoredFuelLogs = (data: FuelLog[]) => {
 };
 
 export const getStoredFinances = (): OperationalFinance[] => {
-  const stored = readStoredArray(STORAGE_KEYS.FINANCES, INITIAL_FINANCES);
-  return stored.map((item) => {
-    const initialMatch = INITIAL_FINANCES.find((init) => init.id === item.id);
-    if (!initialMatch) return item;
-    return {
-      ...initialMatch,
-      ...item,
-      driverId: item.driverId || initialMatch.driverId,
-      driverNip: item.driverNip || initialMatch.driverNip,
-      driverName: item.driverName || initialMatch.driverName,
-      handoverBy: item.handoverBy || initialMatch.handoverBy,
-      receivedBy: item.receivedBy || initialMatch.receivedBy,
-      handoverRole: item.handoverRole || initialMatch.handoverRole
-    };
-  });
+  return readStoredArray(STORAGE_KEYS.FINANCES, INITIAL_FINANCES);
 };
 
 export const saveStoredFinances = (data: OperationalFinance[]) => {
@@ -687,30 +673,7 @@ export const saveStoredMaintenance = (data: MaintenanceRecord[]) => {
 };
 
 export const getStoredDrivers = (): Driver[] => {
-  const stored = readStoredArray(STORAGE_KEYS.DRIVERS, INITIAL_DRIVERS);
-  const merged = stored.map((d) => {
-    const initialMatch = INITIAL_DRIVERS.find((init) => init.id === d.id || init.name === d.name);
-    if (!initialMatch) return d;
-    return {
-      ...initialMatch,
-      ...d,
-      nip: d.nip || initialMatch.nip,
-      employmentType: d.employmentType || initialMatch.employmentType,
-      jobTitle: d.jobTitle || initialMatch.jobTitle,
-      department: d.department || initialMatch.department,
-      companyName: d.companyName || initialMatch.companyName,
-      bankName: d.bankName || initialMatch.bankName,
-      bankAccountNumber: d.bankAccountNumber || initialMatch.bankAccountNumber,
-      helperName: d.helperName || initialMatch.helperName,
-      assignedVehicle: d.assignedVehicle || initialMatch.assignedVehicle
-    };
-  });
-  INITIAL_DRIVERS.forEach((initDriver) => {
-    if (!merged.some((d) => d.id === initDriver.id || d.name === initDriver.name)) {
-      merged.push(initDriver);
-    }
-  });
-  return merged;
+  return readStoredArray(STORAGE_KEYS.DRIVERS, INITIAL_DRIVERS);
 };
 
 export const saveStoredDrivers = (data: Driver[]) => {
@@ -765,20 +728,7 @@ export const loadGoogleSheetsConfig = getStoredConfig;
 export const saveGoogleSheetsConfig = saveStoredConfig;
 
 export const getStoredEquipment = (): EquipmentCashFlow[] => {
-  const stored = readStoredArray(STORAGE_KEYS.EQUIPMENT, INITIAL_EQUIPMENT_CASH_FLOWS);
-  return stored.map((item) => {
-    const initialMatch = INITIAL_EQUIPMENT_CASH_FLOWS.find((init) => init.id === item.id);
-    if (!initialMatch) return item;
-    return {
-      ...initialMatch,
-      ...item,
-      recipientDriverId: item.recipientDriverId || initialMatch.recipientDriverId,
-      recipientName: item.recipientName || initialMatch.recipientName,
-      recipientNip: item.recipientNip || initialMatch.recipientNip,
-      recipientRole: item.recipientRole || initialMatch.recipientRole,
-      handoverBy: item.handoverBy || initialMatch.handoverBy
-    };
-  });
+  return readStoredArray(STORAGE_KEYS.EQUIPMENT, INITIAL_EQUIPMENT_CASH_FLOWS);
 };
 
 export const saveStoredEquipment = (data: EquipmentCashFlow[]) => {
@@ -786,18 +736,7 @@ export const saveStoredEquipment = (data: EquipmentCashFlow[]) => {
 };
 
 export const getStoredPocketFlows = (): DriverPocketCashFlow[] => {
-  const stored = readStoredArray(STORAGE_KEYS.POCKET_FLOWS, INITIAL_DRIVER_POCKET_FLOWS);
-  return stored.map((item) => {
-    const initialMatch = INITIAL_DRIVER_POCKET_FLOWS.find((init) => init.id === item.id);
-    if (!initialMatch) return item;
-    return {
-      ...initialMatch,
-      ...item,
-      driverNip: item.driverNip || initialMatch.driverNip,
-      disbursedBy: item.disbursedBy || initialMatch.disbursedBy,
-      receivedBy: item.receivedBy || initialMatch.receivedBy
-    };
-  });
+  return readStoredArray(STORAGE_KEYS.POCKET_FLOWS, INITIAL_DRIVER_POCKET_FLOWS);
 };
 
 export const saveStoredPocketFlows = (data: DriverPocketCashFlow[]) => {
@@ -829,14 +768,7 @@ export const saveStoredExpenseCategories = (data: ExpenseCategoryReference[]) =>
 };
 
 export const getStoredAdminStaff = (): AdminStaff[] => {
-  const stored = readStoredArray(STORAGE_KEYS.ADMIN_STAFF, INITIAL_ADMIN_STAFF);
-  const merged = [...stored];
-  INITIAL_ADMIN_STAFF.forEach((initStaff) => {
-    if (!merged.some((s) => s.id === initStaff.id || s.nip === initStaff.nip)) {
-      merged.push(initStaff);
-    }
-  });
-  return merged;
+  return readStoredArray(STORAGE_KEYS.ADMIN_STAFF, INITIAL_ADMIN_STAFF);
 };
 
 export const saveStoredAdminStaff = (data: AdminStaff[]) => {
