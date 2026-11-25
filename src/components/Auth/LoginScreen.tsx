@@ -14,8 +14,6 @@ import {
   CalendarCheck,
   Banknote,
   Flame,
-  Trees,
-  Factory,
   Award
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
@@ -28,30 +26,11 @@ interface LoginScreenProps {
   onShowNotification?: (message: string, type: 'success' | 'info' | 'error') => void;
 }
 
-// Background scene choices
-const BACKGROUND_SCENES = [
-  {
-    id: 'paddy',
-    name: 'Sawah Padi & Agraris',
-    icon: Trees,
-    url: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?q=80&w=1920&auto=format&fit=crop',
-    subtitle: 'Keindahan Hamparan Sawah Padi Hijau & Alam Indonesia'
-  },
-  {
-    id: 'factory',
-    name: 'Pabrik & Industri',
-    icon: Factory,
-    url: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?q=80&w=1920&auto=format&fit=crop',
-    subtitle: 'Kawasan Manufaktur & Pusat Logistik Terpadu'
-  },
-  {
-    id: 'harvest',
-    name: 'Panen Emas Padi',
-    icon: Trees,
-    url: 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?q=80&w=1920&auto=format&fit=crop',
-    subtitle: 'Kemitraan Distribusi Hasil Bumi & Pertanian Nasional'
-  }
-];
+// Default landing page background
+const DEFAULT_LANDING_BG = {
+  url: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?q=80&w=1920&auto=format&fit=crop',
+  subtitle: 'Keindahan Hamparan Sawah Padi Hijau & Alam Indonesia'
+};
 
 // Motivational Operational Quotes
 const OPERATIONAL_MOTIVATIONS = [
@@ -90,9 +69,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
-
-  // Background scene index (default: sawah padi hijau yang estetik)
-  const [bgSceneIndex, setBgSceneIndex] = useState(0);
 
   // Motivational Quote Index
   const [quoteIndex, setQuoteIndex] = useState(0);
@@ -229,7 +205,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   };
 
   const currentQuote = OPERATIONAL_MOTIVATIONS[quoteIndex];
-  const activeBg = BACKGROUND_SCENES[bgSceneIndex];
+  const activeBg = DEFAULT_LANDING_BG;
 
   return (
     <div className="min-h-screen flex flex-col justify-between selection:bg-blue-500 selection:text-white relative overflow-x-hidden bg-slate-950">
@@ -266,29 +242,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               Sistem Manajemen Terpadu Operasional Armada, BBM Solar &amp; Rekening Kas
             </p>
           </div>
-        </div>
-
-        {/* Background Scene Theme Switcher Pill */}
-        <div className="flex items-center gap-1.5 bg-slate-900/80 backdrop-blur-md p-1 rounded-2xl border border-white/10 shadow-lg">
-          {BACKGROUND_SCENES.map((scene, idx) => {
-            const Icon = scene.icon;
-            const isActive = bgSceneIndex === idx;
-            return (
-              <button
-                key={scene.id}
-                onClick={() => setBgSceneIndex(idx)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                  isActive
-                    ? 'bg-gradient-to-r from-emerald-600 to-blue-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-white hover:bg-white/5'
-                }`}
-                title={scene.subtitle}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">{scene.name}</span>
-              </button>
-            );
-          })}
         </div>
       </header>
 
@@ -479,12 +432,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
-                </div>
-
-                {/* Security Policy Notice */}
-                <div className="flex items-center gap-2 text-[11px] text-emerald-300/90 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-2">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Keamanan Aktif: Wajib autentikasi login setiap mengakses alamat web.</span>
                 </div>
 
                 {/* Submit Action Button */}
