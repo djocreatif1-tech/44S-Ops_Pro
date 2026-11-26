@@ -69,7 +69,10 @@ import {
   saveStoredSparepartInventory,
   saveStoredSparepartMovements,
   isRunningInGAS,
-  stripDummyRecords
+  stripDummyRecords,
+  markRecordDeleted,
+  unmarkRecordDeleted,
+  mergeLocalWithCloudArray
 } from './utils/storage';
 import { generateAppNotifications } from './utils/notificationEngine';
 import { formatRupiah } from './utils/formatters';
@@ -181,16 +184,39 @@ export function App() {
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
   const pendingMutationsRef = useRef<number>(0);
   const mutationVersionRef = useRef<number>(0);
+  const lastAutoPushTimeRef = useRef<number>(0);
 
   const applyCloudData = (d: any) => {
     if (!d || typeof d !== 'object') return;
-    const cleanCloudArray = <T,>(arr: unknown, prefix = 'REC'): T[] => {
-      if (!Array.isArray(arr)) return [];
-      return stripDummyRecords<T>(arr as T[], prefix);
+    const localCurrent = loadStoredData();
+
+    // Extract any fallback master data carrier records stored in auditLogs (for backward compatibility with older GAS deployments)
+    const fallbackMasterMap: Record<string, any[]> = {};
+    if (Array.isArray(d.auditLogs)) {
+      for (const rawLog of d.auditLogs) {
+        if (rawLog && typeof rawLog.id === 'string' && rawLog.id.startsWith('__SYS_MASTER_SYNC_')) {
+          const modKey = rawLog.moduleKey || rawLog.id.replace('__SYS_MASTER_SYNC_', '').replace(/__$/, '');
+          if (modKey && Array.isArray(rawLog.records)) {
+            fallbackMasterMap[modKey] = rawLog.records;
+          }
+        }
+      }
+    }
+
+    const resolveCloudMasterArray = (key: string): any[] => {
+      const direct = (d as any)[key];
+      if (Array.isArray(direct) && direct.length > 0) return direct;
+      if (Array.isArray(fallbackMasterMap[key])) return fallbackMasterMap[key];
+      if (Array.isArray(direct)) return direct;
+      return [];
     };
 
+    const unsyncedPayload: Record<string, any[]> = {};
+    const unsyncedMasterBackups: Record<string, any[]> = {};
+
+    // 1. Vehicles (Master Kendaraan)
     if (Array.isArray(d.vehicles)) {
-      const cleanVehicles = cleanCloudArray<Vehicle>(d.vehicles, 'VH').map((v: any, idx: number) => ({
+      const normalizedCloudVehicles = stripDummyRecords<Vehicle>(d.vehicles, 'VH').map((v: any, idx: number) => ({
         ...v,
         id: String(v.id || `VH-ROW-${idx + 1}`).trim(),
         nopol: v.nopol || v.plateNumber || '-',
@@ -209,11 +235,15 @@ export function App() {
         targetKmPerLiter: Number(v.targetKmPerLiter) || 5.0,
         capacityTon: Number(v.capacityTon) || 10
       }));
-      setVehicles(cleanVehicles);
-      saveStoredData({ vehicles: cleanVehicles });
+      const { merged, unsyncedLocal } = mergeLocalWithCloudArray<Vehicle>(localCurrent.vehicles, normalizedCloudVehicles, 'VH');
+      setVehicles(merged);
+      saveStoredData({ vehicles: merged });
+      if (unsyncedLocal.length > 0) unsyncedPayload.vehicles = unsyncedLocal;
     }
+
+    // 2. Taxes (Pajak & Legalitas)
     if (Array.isArray(d.taxes)) {
-      const cleanTaxes = cleanCloudArray<TaxRecord>(d.taxes, 'TAX').map((t: any, idx: number) => ({
+      const normalizedCloudTaxes = stripDummyRecords<TaxRecord>(d.taxes, 'TAX').map((t: any, idx: number) => ({
         ...t,
         id: String(t.id || `TAX-ROW-${idx + 1}`).trim(),
         nopol: t.nopol || '-',
@@ -222,11 +252,15 @@ export function App() {
         amount: Number(t.amount ?? t.estimatedCost ?? 0),
         status: t.status || 'due_soon'
       }));
-      setTaxes(cleanTaxes);
-      saveStoredData({ taxes: cleanTaxes });
+      const { merged, unsyncedLocal } = mergeLocalWithCloudArray<TaxRecord>(localCurrent.taxes, normalizedCloudTaxes, 'TAX');
+      setTaxes(merged);
+      saveStoredData({ taxes: merged });
+      if (unsyncedLocal.length > 0) unsyncedPayload.taxes = unsyncedLocal;
     }
+
+    // 3. Fuel Logs (Konsumsi Solar)
     if (Array.isArray(d.fuelLogs)) {
-      const cleanFuel = cleanCloudArray<FuelLog>(d.fuelLogs, 'BBM').map((f: any, idx: number) => ({
+      const normalizedCloudFuel = stripDummyRecords<FuelLog>(d.fuelLogs, 'BBM').map((f: any, idx: number) => ({
         ...f,
         id: String(f.id || `BBM-ROW-${idx + 1}`).trim(),
         nopol: f.nopol || '-',
@@ -237,36 +271,59 @@ export function App() {
         odometer: Number(f.odometer ?? 0),
         fuelStation: f.fuelStation || f.stationName || 'SPBU'
       }));
-      setFuelLogs(cleanFuel);
-      saveStoredData({ fuelLogs: cleanFuel });
+      const { merged, unsyncedLocal } = mergeLocalWithCloudArray<FuelLog>(localCurrent.fuelLogs, normalizedCloudFuel, 'BBM');
+      setFuelLogs(merged);
+      saveStoredData({ fuelLogs: merged });
+      if (unsyncedLocal.length > 0) unsyncedPayload.fuelLogs = unsyncedLocal;
     }
+
+    // 4. Finances (Buku Kas Operasional)
     if (Array.isArray(d.finances)) {
-      const cleanFinances = cleanCloudArray<OperationalFinance>(d.finances, 'FIN');
-      setFinances(cleanFinances);
-      saveStoredData({ finances: cleanFinances });
+      const { merged, unsyncedLocal } = mergeLocalWithCloudArray<OperationalFinance>(localCurrent.finances, d.finances, 'FIN');
+      setFinances(merged);
+      saveStoredData({ finances: merged });
+      if (unsyncedLocal.length > 0) unsyncedPayload.finances = unsyncedLocal;
     }
+
+    // 5. Accounts (Master Rekening Perusahaan)
     if (Array.isArray(d.accounts)) {
-      const cleanAccounts = cleanCloudArray<FinancialAccount>(d.accounts, 'ACC');
-      setAccounts(cleanAccounts);
-      saveStoredData({ accounts: cleanAccounts });
+      const { merged, unsyncedLocal } = mergeLocalWithCloudArray<FinancialAccount>(localCurrent.accounts, d.accounts, 'ACC');
+      setAccounts(merged);
+      saveStoredData({ accounts: merged });
+      if (unsyncedLocal.length > 0) unsyncedPayload.accounts = unsyncedLocal;
     }
+
+    // 6. Company Deposits (Master Perusahaan Pemberi Deposit)
     if (Array.isArray((d as any).companyDeposits)) {
-      const cleanDeposits = cleanCloudArray<CompanyDeposit>((d as any).companyDeposits, 'DEP');
-      setCompanyDeposits(cleanDeposits);
-      saveStoredData({ companyDeposits: cleanDeposits });
+      const { merged, unsyncedLocal } = mergeLocalWithCloudArray<CompanyDeposit>(
+        localCurrent.companyDeposits,
+        (d as any).companyDeposits,
+        'DEP'
+      );
+      setCompanyDeposits(merged);
+      saveStoredData({ companyDeposits: merged });
+      if (unsyncedLocal.length > 0) unsyncedPayload.companyDeposits = unsyncedLocal;
     }
+
+    // 7. Timesheets (Laporan Time Sheet)
     if (Array.isArray(d.timesheets)) {
-      const cleanTimesheets = cleanCloudArray<DriverTimesheet>(d.timesheets, 'TS');
-      setTimesheets(cleanTimesheets);
-      saveStoredData({ timesheets: cleanTimesheets });
+      const { merged, unsyncedLocal } = mergeLocalWithCloudArray<DriverTimesheet>(localCurrent.timesheets, d.timesheets, 'TS');
+      setTimesheets(merged);
+      saveStoredData({ timesheets: merged });
+      if (unsyncedLocal.length > 0) unsyncedPayload.timesheets = unsyncedLocal;
     }
+
+    // 8. Maintenance (Perawatan Rutin Bengkel)
     if (Array.isArray(d.maintenance)) {
-      const cleanMaintenance = cleanCloudArray<MaintenanceRecord>(d.maintenance, 'MNT');
-      setMaintenance(cleanMaintenance);
-      saveStoredData({ maintenance: cleanMaintenance });
+      const { merged, unsyncedLocal } = mergeLocalWithCloudArray<MaintenanceRecord>(localCurrent.maintenance, d.maintenance, 'MNT');
+      setMaintenance(merged);
+      saveStoredData({ maintenance: merged });
+      if (unsyncedLocal.length > 0) unsyncedPayload.maintenance = unsyncedLocal;
     }
+
+    // 9. Drivers (Master Karyawan Driver & Serah Terima)
     if (Array.isArray(d.drivers)) {
-      const cleanDrivers = cleanCloudArray<Driver>(d.drivers, 'DRV').map((dr: any, idx: number) => ({
+      const normalizedCloudDrivers = stripDummyRecords<Driver>(d.drivers, 'DRV').map((dr: any, idx: number) => ({
         ...dr,
         id: String(dr.id || `DRV-ROW-${idx + 1}`).trim(),
         name: dr.name || dr.fullName || '-',
@@ -276,39 +333,239 @@ export function App() {
         assignedVehicle: dr.assignedVehicle || dr.assignedPlateNumber || '-',
         status: dr.status || 'active'
       }));
-      setDrivers(cleanDrivers);
-      saveStoredData({ drivers: cleanDrivers });
+      const { merged, unsyncedLocal } = mergeLocalWithCloudArray<Driver>(localCurrent.drivers, normalizedCloudDrivers, 'DRV');
+      setDrivers(merged);
+      saveStoredData({ drivers: merged });
+      if (unsyncedLocal.length > 0) unsyncedPayload.drivers = unsyncedLocal;
     }
+
+    // 10. Pocket Flows (Arus Kas Saku Driver)
     if (Array.isArray((d as any).pocketFlows)) {
-      const cleanPocket = cleanCloudArray<DriverPocketCashFlow>((d as any).pocketFlows, 'PKT');
-      setPocketFlows(cleanPocket);
-      saveStoredData({ pocketFlows: cleanPocket });
+      const { merged, unsyncedLocal } = mergeLocalWithCloudArray<DriverPocketCashFlow>(
+        localCurrent.pocketFlows,
+        (d as any).pocketFlows,
+        'PKT'
+      );
+      setPocketFlows(merged);
+      saveStoredData({ pocketFlows: merged });
+      if (unsyncedLocal.length > 0) unsyncedPayload.pocketFlows = unsyncedLocal;
     }
+
+    // 11. Equipment Flows (Arus Kas Peralatan)
     const eqList = (d as any).equipmentFlows || (d as any).equipmentList;
     if (Array.isArray(eqList)) {
-      const cleanEq = cleanCloudArray<EquipmentCashFlow>(eqList, 'EQP');
-      setEquipmentList(cleanEq);
-      saveStoredData({ equipment: cleanEq });
+      const { merged, unsyncedLocal } = mergeLocalWithCloudArray<EquipmentCashFlow>(localCurrent.equipment, eqList, 'EQP');
+      setEquipmentList(merged);
+      saveStoredData({ equipment: merged });
+      if (unsyncedLocal.length > 0) unsyncedPayload.equipmentFlows = unsyncedLocal;
     }
+
+    // 12. Trip Sheets (Trip Sheet & Surat Jalan)
     if (Array.isArray((d as any).tripSheets)) {
-      const cleanTrips = cleanCloudArray<TripSheet>((d as any).tripSheets, 'TRP');
-      setTripSheets(cleanTrips);
-      saveStoredData({ tripSheets: cleanTrips });
+      const { merged, unsyncedLocal } = mergeLocalWithCloudArray<TripSheet>(localCurrent.tripSheets, (d as any).tripSheets, 'TRP');
+      setTripSheets(merged);
+      saveStoredData({ tripSheets: merged });
+      if (unsyncedLocal.length > 0) unsyncedPayload.tripSheets = unsyncedLocal;
     }
+
+    // 13. Sparepart Inventory (Inventory Sparepart Baru & Bekas)
     if (Array.isArray((d as any).sparepartInventory)) {
-      const cleanParts = cleanCloudArray<SparepartInventoryItem>((d as any).sparepartInventory, 'PRT');
-      setSparepartInventory(cleanParts);
-      saveStoredData({ sparepartInventory: cleanParts });
+      const { merged, unsyncedLocal } = mergeLocalWithCloudArray<SparepartInventoryItem>(
+        localCurrent.sparepartInventory,
+        (d as any).sparepartInventory,
+        'PRT'
+      );
+      setSparepartInventory(merged);
+      saveStoredData({ sparepartInventory: merged });
+      if (unsyncedLocal.length > 0) unsyncedPayload.sparepartInventory = unsyncedLocal;
     }
+
+    // 14. Sparepart Movements (Mutasi Gudang Sparepart)
     if (Array.isArray((d as any).sparepartMovements)) {
-      const cleanMovs = cleanCloudArray<SparepartStockMovement>((d as any).sparepartMovements, 'MOV');
-      setSparepartMovements(cleanMovs);
-      saveStoredData({ sparepartMovements: cleanMovs });
+      const { merged, unsyncedLocal } = mergeLocalWithCloudArray<SparepartStockMovement>(
+        localCurrent.sparepartMovements,
+        (d as any).sparepartMovements,
+        'MOV'
+      );
+      setSparepartMovements(merged);
+      saveStoredData({ sparepartMovements: merged });
+      if (unsyncedLocal.length > 0) unsyncedPayload.sparepartMovements = unsyncedLocal;
     }
+
+    // 15. Master Karyawan Administrasi (44S_Ops_AdminStaff)
+    {
+      const cloudAdminStaff = resolveCloudMasterArray('adminStaff');
+      const { merged, unsyncedLocal } = mergeLocalWithCloudArray<AdminStaff>(localCurrent.adminStaff, cloudAdminStaff, 'ADM');
+      setAdminStaff(merged);
+      saveStoredData({ adminStaff: merged });
+      if (unsyncedLocal.length > 0) {
+        unsyncedPayload.adminStaff = unsyncedLocal;
+        unsyncedMasterBackups.adminStaff = merged;
+      }
+    }
+
+    // 16. Master Supplier Peralatan & Sparepart (44S_Ops_Suppliers)
+    {
+      const cloudSuppliers = resolveCloudMasterArray('suppliers');
+      const { merged, unsyncedLocal } = mergeLocalWithCloudArray<EquipmentSupplier>(localCurrent.suppliers, cloudSuppliers, 'SUP');
+      setSuppliers(merged);
+      saveStoredData({ suppliers: merged });
+      if (unsyncedLocal.length > 0) {
+        unsyncedPayload.suppliers = unsyncedLocal;
+        unsyncedMasterBackups.suppliers = merged;
+      }
+    }
+
+    // 17. Master Jenis Pengeluaran (44S_Ops_ExpenseCategories)
+    {
+      const cloudExpenseCats = resolveCloudMasterArray('expenseCategories');
+      const { merged, unsyncedLocal } = mergeLocalWithCloudArray<ExpenseCategoryReference>(
+        localCurrent.expenseCategories,
+        cloudExpenseCats,
+        'EXP'
+      );
+      setExpenseCategories(merged);
+      saveStoredData({ expenseCategories: merged });
+      if (unsyncedLocal.length > 0) {
+        unsyncedPayload.expenseCategories = unsyncedLocal;
+        unsyncedMasterBackups.expenseCategories = merged;
+      }
+    }
+
+    // 18. Master Metode Pembayaran (44S_Ops_PaymentMethods)
+    {
+      const cloudPaymentMethods = resolveCloudMasterArray('paymentMethods');
+      const { merged, unsyncedLocal } = mergeLocalWithCloudArray<PaymentMethod>(
+        localCurrent.paymentMethods,
+        cloudPaymentMethods,
+        'PM'
+      );
+      setPaymentMethods(merged);
+      saveStoredData({ paymentMethods: merged });
+      if (unsyncedLocal.length > 0) {
+        unsyncedPayload.paymentMethods = unsyncedLocal;
+        unsyncedMasterBackups.paymentMethods = merged;
+      }
+    }
+
+    // 19. Master Jenis Servis Bengkel (44S_Ops_ServiceTypes)
+    {
+      const cloudServiceTypes = resolveCloudMasterArray('serviceTypes');
+      const { merged, unsyncedLocal } = mergeLocalWithCloudArray<ServiceTypeReference>(
+        localCurrent.serviceTypes,
+        cloudServiceTypes,
+        'SRV'
+      );
+      setServiceTypes(merged);
+      saveStoredData({ serviceTypes: merged });
+      if (unsyncedLocal.length > 0) {
+        unsyncedPayload.serviceTypes = unsyncedLocal;
+        unsyncedMasterBackups.serviceTypes = merged;
+      }
+    }
+
+    // 20. Master Golongan SIM Pengemudi (44S_Ops_SimClasses)
+    {
+      const cloudSimClasses = resolveCloudMasterArray('simClasses');
+      const { merged, unsyncedLocal } = mergeLocalWithCloudArray<SimClassReference>(
+        localCurrent.simClasses,
+        cloudSimClasses,
+        'SIM'
+      );
+      setSimClasses(merged);
+      saveStoredData({ simClasses: merged });
+      if (unsyncedLocal.length > 0) {
+        unsyncedPayload.simClasses = unsyncedLocal;
+        unsyncedMasterBackups.simClasses = merged;
+      }
+    }
+
+    // 21. Master Pemasukan Non-Sewa (44S_Ops_NonRentalCategories)
+    {
+      const cloudNonRental = resolveCloudMasterArray('nonRentalCategories');
+      const { merged, unsyncedLocal } = mergeLocalWithCloudArray<NonRentalIncomeCategory>(
+        localCurrent.nonRentalCategories,
+        cloudNonRental,
+        'NRC'
+      );
+      setNonRentalCategories(merged);
+      saveStoredData({ nonRentalCategories: merged });
+      if (unsyncedLocal.length > 0) {
+        unsyncedPayload.nonRentalCategories = unsyncedLocal;
+        unsyncedMasterBackups.nonRentalCategories = merged;
+      }
+    }
+
+    // 22. Riwayat Top-Up Deposit Perusahaan (44S_Ops_DepositTopUps)
+    {
+      const cloudTopUps = resolveCloudMasterArray('depositTopUps');
+      const { merged, unsyncedLocal } = mergeLocalWithCloudArray<DepositTopUpRecord>(
+        localCurrent.depositTopUps,
+        cloudTopUps,
+        'TOP'
+      );
+      setDepositTopUps(merged);
+      saveStoredData({ depositTopUps: merged });
+      if (unsyncedLocal.length > 0) {
+        unsyncedPayload.depositTopUps = unsyncedLocal;
+        unsyncedMasterBackups.depositTopUps = merged;
+      }
+    }
+
+    // 23. Pengajuan Deposit Perusahaan (44S_Ops_DepositRequests)
+    {
+      const cloudRequests = resolveCloudMasterArray('depositRequests');
+      const { merged, unsyncedLocal } = mergeLocalWithCloudArray<CompanyDepositRequest>(
+        localCurrent.depositRequests,
+        cloudRequests,
+        'REQ'
+      );
+      setDepositRequests(merged);
+      saveStoredData({ depositRequests: merged });
+      if (unsyncedLocal.length > 0) {
+        unsyncedPayload.depositRequests = unsyncedLocal;
+        unsyncedMasterBackups.depositRequests = merged;
+      }
+    }
+
+    // 24. Users (Manajemen Pengguna)
     if (Array.isArray((d as any).users) && (d as any).users.length > 0) {
-      const cleanUsers = cleanCloudArray<UserAccount>((d as any).users, 'USR');
-      setUsers(cleanUsers);
-      saveStoredData({ users: cleanUsers });
+      const { merged, unsyncedLocal } = mergeLocalWithCloudArray<UserAccount>(localCurrent.users, (d as any).users, 'USR');
+      setUsers(merged);
+      saveStoredData({ users: merged });
+      if (unsyncedLocal.length > 0) unsyncedPayload.users = unsyncedLocal;
+    }
+
+    // 25. Activity Logs (excluding internal __SYS_MASTER_SYNC_ carrier records)
+    if (Array.isArray(d.auditLogs) && d.auditLogs.length > 0) {
+      const { merged } = mergeLocalWithCloudArray<ActivityLog>(localCurrent.activityLogs, d.auditLogs, 'LOG');
+      setActivityLogs(merged);
+      saveStoredData({ activityLogs: merged });
+    }
+
+    // Automatically push any local data that is not yet in the primary Google Spreadsheet database
+    const unsyncedKeys = Object.keys(unsyncedPayload);
+    const nowMs = Date.now();
+    if (unsyncedKeys.length > 0 && nowMs - lastAutoPushTimeRef.current > 12000) {
+      lastAutoPushTimeRef.current = nowMs;
+      const cfg = loadGoogleSheetsConfig();
+      const targetUrl = (gasConfig.webAppUrl || cfg.webAppUrl || '').trim();
+      if (isRunningInGAS() || (targetUrl && targetUrl.startsWith('http'))) {
+        syncToGoogleAppsScript(targetUrl, 'bulkSync', unsyncedPayload).catch(() => {});
+        for (const [mKey, fullList] of Object.entries(unsyncedMasterBackups)) {
+          syncToGoogleAppsScript(targetUrl, 'addAuditLog', {
+            id: `__SYS_MASTER_SYNC_${mKey}__`,
+            timestamp: new Date().toISOString(),
+            module: 'master_data',
+            action: 'sync',
+            title: 'SYS_MASTER_SYNC',
+            description: mKey,
+            _isMasterBackup: true,
+            moduleKey: mKey,
+            records: fullList
+          }).catch(() => {});
+        }
+      }
     }
   };
 
@@ -761,6 +1018,17 @@ export function App() {
   // Push to Google Sheets if configured or running inside GAS
   const pushToGas = async (action: string, data: unknown) => {
     mutationVersionRef.current += 1;
+    // Automatically track deleted or restored record IDs so local sync never resurrects deleted rows or drops active rows
+    if (data && typeof data === 'object' && 'id' in (data as Record<string, unknown>)) {
+      const recId = String((data as Record<string, unknown>).id || '').trim();
+      if (recId) {
+        if (action.toLowerCase().startsWith('delete')) {
+          markRecordDeleted(recId);
+        } else if (action.toLowerCase().startsWith('add') || action.toLowerCase().startsWith('update')) {
+          unmarkRecordDeleted(recId);
+        }
+      }
+    }
     const cfg = loadGoogleSheetsConfig();
     const targetUrl = (gasConfig.webAppUrl || cfg.webAppUrl || '').trim();
     if (!isRunningInGAS() && (!targetUrl || !targetUrl.startsWith('http'))) return;
@@ -773,6 +1041,30 @@ export function App() {
       setTimeout(() => {
         pendingMutationsRef.current = Math.max(0, pendingMutationsRef.current - 1);
       }, 2000);
+    }
+  };
+
+  // Backward-compatible carrier backup for Master & Referensi tables in case user's deployed GAS Web App is an older version
+  const pushMasterBackupToGas = async (moduleKey: string, records: unknown[]) => {
+    const cfg = loadGoogleSheetsConfig();
+    const targetUrl = (gasConfig.webAppUrl || cfg.webAppUrl || '').trim();
+    if (!isRunningInGAS() && (!targetUrl || !targetUrl.startsWith('http'))) return;
+    try {
+      await syncToGoogleAppsScript(targetUrl, 'updateAuditLog', {
+        id: `__SYS_MASTER_SYNC_${moduleKey}`,
+        timestamp: new Date().toISOString(),
+        actorName: 'SYSTEM_MASTER_SYNC',
+        actorRole: 'system',
+        module: 'master_data',
+        actionType: 'sync',
+        title: `Master Sync Carrier: ${moduleKey}`,
+        description: JSON.stringify(records),
+        targetId: moduleKey,
+        targetLabel: `Master ${moduleKey}`,
+        severity: 'info'
+      });
+    } catch {
+      // ignore
     }
   };
 
@@ -1574,6 +1866,8 @@ export function App() {
       'success'
     );
     persistAll({ nonRentalCategories: updated });
+    pushToGas('addNonRentalCategory', cat);
+    pushMasterBackupToGas('nonRentalCategories', updated);
     showToast(`Kategori pemasukan non-sewa "${cat.name}" berhasil ditambahkan!`);
   };
 
@@ -1592,6 +1886,8 @@ export function App() {
       'primary'
     );
     persistAll({ nonRentalCategories: updated });
+    pushToGas('updateNonRentalCategory', cat);
+    pushMasterBackupToGas('nonRentalCategories', updated);
     showToast(`Kategori "${cat.name}" berhasil diperbarui!`);
   };
 
@@ -1611,6 +1907,8 @@ export function App() {
       'danger'
     );
     persistAll({ nonRentalCategories: updated });
+    pushToGas('deleteNonRentalCategory', { id });
+    pushMasterBackupToGas('nonRentalCategories', updated);
     showToast('Kategori pemasukan non-sewa berhasil dihapus.', 'info');
   };
 
@@ -1630,6 +1928,8 @@ export function App() {
       'success'
     );
     persistAll({ paymentMethods: updated });
+    pushToGas('addPaymentMethod', pm);
+    pushMasterBackupToGas('paymentMethods', updated);
     showToast(`Metode pembayaran "${pm.name}" berhasil ditambahkan!`);
   };
 
@@ -1648,6 +1948,8 @@ export function App() {
       'primary'
     );
     persistAll({ paymentMethods: updated });
+    pushToGas('updatePaymentMethod', pm);
+    pushMasterBackupToGas('paymentMethods', updated);
     showToast(`Metode pembayaran "${pm.name}" berhasil diperbarui!`);
   };
 
@@ -1667,6 +1969,8 @@ export function App() {
       'danger'
     );
     persistAll({ paymentMethods: updated });
+    pushToGas('deletePaymentMethod', { id });
+    pushMasterBackupToGas('paymentMethods', updated);
     showToast('Master metode pembayaran berhasil dihapus.', 'info');
   };
 
@@ -1687,6 +1991,7 @@ export function App() {
     );
     persistAll({ serviceTypes: updated });
     pushToGas('addServiceType', st);
+    pushMasterBackupToGas('serviceTypes', updated);
     showToast(`Master servis "${st.name}" berhasil ditambahkan!`);
   };
 
@@ -1706,6 +2011,7 @@ export function App() {
     );
     persistAll({ serviceTypes: updated });
     pushToGas('updateServiceType', st);
+    pushMasterBackupToGas('serviceTypes', updated);
     showToast(`Master servis "${st.name}" berhasil diperbarui!`);
   };
 
@@ -1726,6 +2032,7 @@ export function App() {
     );
     persistAll({ serviceTypes: updated });
     pushToGas('deleteServiceType', { id });
+    pushMasterBackupToGas('serviceTypes', updated);
     showToast('Master jenis servis berhasil dihapus.', 'info');
   };
 
@@ -1746,6 +2053,7 @@ export function App() {
     );
     persistAll({ simClasses: updated });
     pushToGas('addSimClass', sc);
+    pushMasterBackupToGas('simClasses', updated);
     showToast(`Golongan SIM "${sc.name}" berhasil ditambahkan!`);
   };
 
@@ -1765,6 +2073,7 @@ export function App() {
     );
     persistAll({ simClasses: updated });
     pushToGas('updateSimClass', sc);
+    pushMasterBackupToGas('simClasses', updated);
     showToast(`Golongan SIM "${sc.name}" berhasil diperbarui!`);
   };
 
@@ -1785,6 +2094,7 @@ export function App() {
     );
     persistAll({ simClasses: updated });
     pushToGas('deleteSimClass', { id });
+    pushMasterBackupToGas('simClasses', updated);
     showToast('Master golongan SIM berhasil dihapus.', 'info');
   };
 
@@ -1804,6 +2114,8 @@ export function App() {
       'success'
     );
     persistAll({ suppliers: updated });
+    pushToGas('addSupplier', sup);
+    pushMasterBackupToGas('suppliers', updated);
     showToast(`Supplier "${sup.name}" berhasil didaftarkan!`);
   };
 
@@ -1822,6 +2134,8 @@ export function App() {
       'primary'
     );
     persistAll({ suppliers: updated });
+    pushToGas('updateSupplier', sup);
+    pushMasterBackupToGas('suppliers', updated);
     showToast(`Data supplier "${sup.name}" berhasil diperbarui!`);
   };
 
@@ -1841,6 +2155,8 @@ export function App() {
       'danger'
     );
     persistAll({ suppliers: updated });
+    pushToGas('deleteSupplier', { id });
+    pushMasterBackupToGas('suppliers', updated);
     showToast('Supplier berhasil dihapus.', 'info');
   };
 
@@ -1860,6 +2176,8 @@ export function App() {
       'success'
     );
     persistAll({ expenseCategories: updated });
+    pushToGas('addExpenseCategory', cat);
+    pushMasterBackupToGas('expenseCategories', updated);
     showToast(`Jenis pengeluaran "${cat.name}" berhasil ditambahkan!`);
   };
 
@@ -1878,6 +2196,8 @@ export function App() {
       'primary'
     );
     persistAll({ expenseCategories: updated });
+    pushToGas('updateExpenseCategory', cat);
+    pushMasterBackupToGas('expenseCategories', updated);
     showToast(`Jenis pengeluaran "${cat.name}" berhasil diperbarui!`);
   };
 
@@ -1897,6 +2217,8 @@ export function App() {
       'danger'
     );
     persistAll({ expenseCategories: updated });
+    pushToGas('deleteExpenseCategory', { id });
+    pushMasterBackupToGas('expenseCategories', updated);
     showToast('Jenis pengeluaran berhasil dihapus.', 'info');
   };
 
@@ -1916,6 +2238,8 @@ export function App() {
       'success'
     );
     persistAll({ adminStaff: updated });
+    pushToGas('addAdminStaff', staff);
+    pushMasterBackupToGas('adminStaff', updated);
     showToast(`Karyawan administrasi "${staff.name}" berhasil didaftarkan!`);
   };
 
@@ -1934,6 +2258,8 @@ export function App() {
       'primary'
     );
     persistAll({ adminStaff: updated });
+    pushToGas('updateAdminStaff', staff);
+    pushMasterBackupToGas('adminStaff', updated);
     showToast(`Data karyawan "${staff.name}" berhasil diperbarui!`);
   };
 
@@ -1953,6 +2279,8 @@ export function App() {
       'danger'
     );
     persistAll({ adminStaff: updated });
+    pushToGas('deleteAdminStaff', { id });
+    pushMasterBackupToGas('adminStaff', updated);
     showToast('Karyawan administrasi berhasil dihapus.', 'info');
   };
 
@@ -1965,16 +2293,19 @@ export function App() {
     saveStoredDepositTopUpHistory(updatedTopUps);
 
     // Update Company Deposit balance
+    let updatedCompanyObj: CompanyDeposit | undefined;
     const updatedCompanies = safeDeposits.map(c => {
       if (c.id === rec.companyId) {
         const newBal = (c.currentBalance || 0) + rec.amount;
-        return {
+        const nextComp = {
           ...c,
           currentBalance: newBal,
           totalTopUp: (c.totalTopUp || 0) + rec.amount,
           lastTopUpDate: rec.date,
           status: (newBal > (c.minimumBalanceWarning || 0) ? 'active' : c.status) as any
         };
+        updatedCompanyObj = nextComp;
+        return nextComp;
       }
       return c;
     });
@@ -1983,10 +2314,13 @@ export function App() {
 
     // Update Bank Account balance if bankAccountId is provided
     let updatedAccounts = safeAccounts;
+    let updatedAccountObj: FinancialAccount | undefined;
     if (rec.bankAccountId) {
       updatedAccounts = safeAccounts.map(a => {
         if (a.id === rec.bankAccountId) {
-          return { ...a, currentBalance: a.currentBalance + rec.amount };
+          const nextAcc = { ...a, currentBalance: a.currentBalance + rec.amount };
+          updatedAccountObj = nextAcc;
+          return nextAcc;
         }
         return a;
       });
@@ -2009,6 +2343,10 @@ export function App() {
       companyDeposits: updatedCompanies,
       depositTopUps: updatedTopUps
     });
+    pushToGas('addDepositTopUp', rec);
+    pushMasterBackupToGas('depositTopUps', updatedTopUps);
+    if (updatedCompanyObj) pushToGas('updateCompanyDeposit', updatedCompanyObj);
+    if (updatedAccountObj) pushToGas('updateAccount', updatedAccountObj);
     showToast(`Top-up deposit ${rec.companyName} (${formatRupiah(rec.amount)}) berhasil dicatat!`);
   };
 
@@ -2028,6 +2366,8 @@ export function App() {
       'primary'
     );
     persistAll({ depositRequests: updated });
+    pushToGas('addDepositRequest', req);
+    pushMasterBackupToGas('depositRequests', updated);
     showToast(`Pengajuan deposit ${req.requestNumber} (${formatRupiah(req.amount)}) berhasil diajukan!`);
   };
 
@@ -2046,6 +2386,8 @@ export function App() {
       'info'
     );
     persistAll({ depositRequests: updated });
+    pushToGas('updateDepositRequest', req);
+    pushMasterBackupToGas('depositRequests', updated);
     showToast(`Data pengajuan deposit ${req.requestNumber} diperbarui!`);
   };
 
@@ -2065,20 +2407,25 @@ export function App() {
       'danger'
     );
     persistAll({ depositRequests: updated });
+    pushToGas('deleteDepositRequest', { id });
+    pushMasterBackupToGas('depositRequests', updated);
     showToast('Berkas pengajuan deposit telah dihapus.', 'info');
   };
 
   const handleApproveDepositRequest = (id: string, approverName: string) => {
     const target = depositRequests.find(r => r.id === id);
     if (!target) return;
+    let updatedReqObj: CompanyDepositRequest | undefined;
     const updated = depositRequests.map(r => {
       if (r.id === id) {
-        return {
+        const nextReq = {
           ...r,
           status: 'approved' as const,
           approvedBy: approverName,
           approvedAt: new Date().toLocaleString('id-ID')
         };
+        updatedReqObj = nextReq;
+        return nextReq;
       }
       return r;
     });
@@ -2095,6 +2442,8 @@ export function App() {
       'success'
     );
     persistAll({ depositRequests: updated });
+    if (updatedReqObj) pushToGas('updateDepositRequest', updatedReqObj);
+    pushMasterBackupToGas('depositRequests', updated);
     showToast(`Pengajuan ${target.requestNumber} (${formatRupiah(target.amount)}) telah disetujui!`);
   };
 
@@ -2108,13 +2457,16 @@ export function App() {
     const safeAccounts = asArray<FinancialAccount>(accounts);
 
     // 1. Mark request as completed
+    let completedReqObj: CompanyDepositRequest | undefined;
     const updatedRequests = depositRequests.map(r => {
       if (r.id === req.id) {
-        return {
+        const nextReq = {
           ...r,
           status: 'completed' as const,
           completedAt: new Date().toLocaleString('id-ID')
         };
+        completedReqObj = nextReq;
+        return nextReq;
       }
       return r;
     });
@@ -2142,16 +2494,19 @@ export function App() {
     saveStoredDepositTopUpHistory(updatedTopUps);
 
     // 3. Credit Company Deposit balance
+    let updatedCompanyObj: CompanyDeposit | undefined;
     const updatedCompanies = safeDeposits.map(c => {
       if (c.id === req.companyId) {
         const newBal = (c.currentBalance || 0) + req.amount;
-        return {
+        const nextComp = {
           ...c,
           currentBalance: newBal,
           totalTopUp: (c.totalTopUp || 0) + req.amount,
           lastTopUpDate: new Date().toISOString().slice(0, 10),
           status: (newBal > (c.minimumBalanceWarning || 0) ? 'active' : c.status) as any
         };
+        updatedCompanyObj = nextComp;
+        return nextComp;
       }
       return c;
     });
@@ -2160,10 +2515,13 @@ export function App() {
 
     // 4. Credit Financial Account balance
     let updatedAccounts = safeAccounts;
+    let updatedAccountObj: FinancialAccount | undefined;
     if (acc) {
       updatedAccounts = safeAccounts.map(a => {
         if (a.id === acc.id) {
-          return { ...a, currentBalance: a.currentBalance + req.amount };
+          const nextAcc = { ...a, currentBalance: a.currentBalance + req.amount };
+          updatedAccountObj = nextAcc;
+          return nextAcc;
         }
         return a;
       });
@@ -2187,19 +2545,28 @@ export function App() {
       depositTopUps: updatedTopUps,
       depositRequests: updatedRequests
     });
+    if (completedReqObj) pushToGas('updateDepositRequest', completedReqObj);
+    pushToGas('addDepositTopUp', topUpRecord);
+    if (updatedCompanyObj) pushToGas('updateCompanyDeposit', updatedCompanyObj);
+    if (updatedAccountObj) pushToGas('updateAccount', updatedAccountObj);
+    pushMasterBackupToGas('depositRequests', updatedRequests);
+    pushMasterBackupToGas('depositTopUps', updatedTopUps);
     showToast(`Pengajuan ${req.requestNumber} berhasil direalisasikan! Saldo deposit ${req.companyName} bertambah ${formatRupiah(req.amount)}.`);
   };
 
   const handleRejectDepositRequest = (id: string, reason: string) => {
     const target = depositRequests.find(r => r.id === id);
     if (!target) return;
+    let rejectedReqObj: CompanyDepositRequest | undefined;
     const updated = depositRequests.map(r => {
       if (r.id === id) {
-        return {
+        const nextReq = {
           ...r,
           status: 'rejected' as const,
           rejectionReason: reason
         };
+        rejectedReqObj = nextReq;
+        return nextReq;
       }
       return r;
     });
@@ -2216,6 +2583,8 @@ export function App() {
       'warning'
     );
     persistAll({ depositRequests: updated });
+    if (rejectedReqObj) pushToGas('updateDepositRequest', rejectedReqObj);
+    pushMasterBackupToGas('depositRequests', updated);
     showToast(`Pengajuan deposit ${target.requestNumber} ditolak.`, 'info');
   };
 
@@ -3299,7 +3668,7 @@ export function App() {
       return;
     }
     setIsSyncing(true);
-    showToast('Sinkronisasi Batch seluruh 16 modul HP & PC...', 'info');
+    showToast('Sinkronisasi Batch seluruh 26 tabel Operasional & Master Referensi ke Google Spreadsheet...', 'info');
     try {
       await syncToGoogleAppsScript(gasConfig.webAppUrl, 'bulkSync', {
         vehicles,
@@ -3316,11 +3685,20 @@ export function App() {
         drivers,
         accounts,
         companyDeposits,
+        adminStaff,
+        suppliers,
+        expenseCategories,
+        paymentMethods,
+        serviceTypes,
+        simClasses,
+        nonRentalCategories,
+        depositTopUps,
+        depositRequests,
         users,
         auditLogs: activityLogs.slice(0, 250)
       });
       await pullFromGas(true);
-      showToast('Sinkronisasi cloud Google Spreadsheet berhasil (Hemat DB & Cepat)!');
+      showToast('Sinkronisasi seluruh tabel Operasional & Master Referensi ke Google Spreadsheet berhasil!');
     } catch {
       showToast('Gagal terhubung ke Apps Script. Periksa URL Web App.', 'error');
     } finally {
@@ -3950,6 +4328,15 @@ export function App() {
             drivers,
             accounts,
             companyDeposits,
+            adminStaff,
+            suppliers,
+            expenseCategories,
+            paymentMethods,
+            serviceTypes,
+            simClasses,
+            nonRentalCategories,
+            depositTopUps,
+            depositRequests,
             users,
             auditLogs: activityLogs.slice(0, 250)
           }}

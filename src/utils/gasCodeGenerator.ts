@@ -27,7 +27,7 @@ export const GAS_KODE_GS = `/**
  */
 
 var APP_TITLE = '44S Ops_pro - Sistem Manajemen Terpadu Operasional Kendaraan & Rekening Kas';
-var CACHE_KEY_ALL_DATA = '44S_OPS_CLEAN_CACHE_V7';
+var CACHE_KEY_ALL_DATA = '44S_OPS_CLEAN_CACHE_V8';
 var CACHE_TTL_SECONDS = 60;
 
 var SHEETS = {
@@ -43,8 +43,17 @@ var SHEETS = {
   SPAREPARTS: '44S_Ops_Spareparts',
   SPAREPART_MOVEMENTS: '44S_Ops_SparepartMovements',
   DRIVERS: '44S_Ops_Drivers',
+  ADMIN_STAFF: '44S_Ops_AdminStaff',
+  SUPPLIERS: '44S_Ops_Suppliers',
+  EXPENSE_CATEGORIES: '44S_Ops_ExpenseCategories',
+  PAYMENT_METHODS: '44S_Ops_PaymentMethods',
   ACCOUNTS: '44S_Ops_Accounts',
+  SERVICE_TYPES: '44S_Ops_ServiceTypes',
+  SIM_CLASSES: '44S_Ops_SimClasses',
+  NON_RENTAL_CATEGORIES: '44S_Ops_NonRentalCategories',
   COMPANY_DEPOSITS: '44S_Ops_CompanyDeposits',
+  DEPOSIT_TOPUPS: '44S_Ops_DepositTopUps',
+  DEPOSIT_REQUESTS: '44S_Ops_DepositRequests',
   USERS: '44S_Ops_Users',
   AUDIT_LOGS: '44S_Ops_AuditLogs',
   MASTER_REF: '44S_Ops_MasterRef'
@@ -119,15 +128,61 @@ SHEET_SCHEMAS[SHEETS.DRIVERS] = [
   'Golongan SIM', 'No. SIM', 'Masa Berlaku SIM', 'Status Tugas',
   'Tanggal Bergabung', 'Unit Pegangan (Nopol)', 'Perusahaan / Pemilik', 'rawJson'
 ];
+SHEET_SCHEMAS[SHEETS.ADMIN_STAFF] = [
+  'ID Staf', 'NIK / NIP', 'Nama Lengkap', 'Jabatan', 'Peran / Role',
+  'Departemen', 'No. WhatsApp / HP', 'Email', 'Alamat', 'Status',
+  'Tanggal Bergabung', 'Catatan', 'rawJson'
+];
+SHEET_SCHEMAS[SHEETS.SUPPLIERS] = [
+  'ID Supplier', 'Kode Supplier', 'Nama Supplier / Toko', 'Kategori',
+  'PIC / Kontak', 'No. Telepon / WA', 'Email', 'Alamat', 'Bank',
+  'No. Rekening', 'Termin Pembayaran', 'Status Aktif', 'Catatan', 'rawJson'
+];
+SHEET_SCHEMAS[SHEETS.EXPENSE_CATEGORIES] = [
+  'ID Kategori', 'Kode Pengeluaran', 'Nama Jenis Pengeluaran',
+  'Kelompok / Grup', 'Plafon / Standar Biaya (Rp)', 'Wajib Nota?',
+  'Status Aktif', 'Deskripsi', 'rawJson'
+];
+SHEET_SCHEMAS[SHEETS.PAYMENT_METHODS] = [
+  'ID Metode', 'Kode Metode', 'Nama Metode Pembayaran', 'Kategori',
+  'ID Rekening Default', 'Nama Rekening Default', 'Wajib Bukti?',
+  'Status Aktif', 'Deskripsi', 'Catatan', 'rawJson'
+];
 SHEET_SCHEMAS[SHEETS.ACCOUNTS] = [
   'ID Akun', 'Nama Akun / Rekening', 'Nomor Rekening', 'Bank / Penyedia',
   'Tipe Akun', 'Saldo Awal (Rp)', 'Saldo Terkini (Rp)', 'Catatan',
   'Perusahaan / Pemilik', 'rawJson'
 ];
+SHEET_SCHEMAS[SHEETS.SERVICE_TYPES] = [
+  'ID Jenis Servis', 'Kode Servis', 'Nama Pekerjaan Servis', 'Kategori Servis',
+  'Interval KM', 'Interval Hari', 'Estimasi Biaya (Rp)', 'Suku Cadang Umum',
+  'Status Aktif', 'Deskripsi', 'rawJson'
+];
+SHEET_SCHEMAS[SHEETS.SIM_CLASSES] = [
+  'ID Golongan SIM', 'Kode SIM', 'Nama Golongan SIM', 'Klasifikasi Kendaraan',
+  'Usia Minimal', 'Masa Berlaku (Thn)', 'Armada Diizinkan', 'Status Aktif',
+  'Deskripsi', 'rawJson'
+];
+SHEET_SCHEMAS[SHEETS.NON_RENTAL_CATEGORIES] = [
+  'ID Kategori Non-Sewa', 'Kode Kategori', 'Nama Pemasukan Non-Sewa',
+  'Tarif Acuan (Rp)', 'ID Rekening Default', 'Status Aktif',
+  'Deskripsi', 'Catatan', 'rawJson'
+];
 SHEET_SCHEMAS[SHEETS.COMPANY_DEPOSITS] = [
   'id', 'companyName', 'contactPerson', 'phone', 'depositedAmount',
   'usedPocketMoney', 'usedFuelCost', 'remainingBalance', 'status',
   'companyCode', 'rawJson'
+];
+SHEET_SCHEMAS[SHEETS.DEPOSIT_TOPUPS] = [
+  'ID Top-Up', 'Tanggal', 'ID Perusahaan', 'Nama Perusahaan',
+  'Jumlah Top-Up (Rp)', 'No. Bukti Transfer', 'ID Rekening Tujuan',
+  'Nama Rekening Tujuan', 'Metode Pembayaran', 'Catatan', 'rawJson'
+];
+SHEET_SCHEMAS[SHEETS.DEPOSIT_REQUESTS] = [
+  'ID Pengajuan', 'No. Pengajuan', 'Tanggal Pengajuan', 'ID Perusahaan',
+  'Kode Perusahaan', 'Nama Perusahaan', 'Jumlah Diajukan (Rp)', 'Keperluan',
+  'Pemohon / PIC', 'No. HP Pemohon', 'Urgensi', 'Status',
+  'Disetujui Oleh', 'Catatan', 'rawJson'
 ];
 SHEET_SCHEMAS[SHEETS.USERS] = [
   'id', 'username', 'name', 'email', 'phone', 'role', 'status',
@@ -137,6 +192,9 @@ SHEET_SCHEMAS[SHEETS.AUDIT_LOGS] = [
   'ID Log', 'Waktu Timestamp', 'User ID', 'Nama Pengguna',
   'Hak Akses (Role)', 'Modul', 'Aksi', 'Keterangan Aktivitas',
   'Detail Tambahan', 'rawJson'
+];
+SHEET_SCHEMAS[SHEETS.MASTER_REF] = [
+  'id', 'refType', 'code', 'name', 'category', 'companyName', 'status', 'updatedAt', 'rawJson'
 ];
 
 /**
@@ -153,7 +211,7 @@ function doGet(e) {
   if (params.action === 'ping') {
     return createJsonResponse({
       status: 'success',
-      message: '44S Ops_pro Fast Cloud Engine Ready (Granular Single-Record CRUD)',
+      message: '44S Ops_pro Fast Cloud Engine Ready (25 Tabel Terintegrasi & Granular CRUD)',
       timestamp: new Date().toISOString()
     });
   }
@@ -208,6 +266,33 @@ function runClientApi(payload) {
 }
 
 /**
+ * Helper Sinkronisasi Indeks Master Referensi Terpadu (44S_Ops_MasterRef)
+ */
+function syncMasterRefIndex(ss, refType, record, isDelete) {
+  try {
+    if (!record) return;
+    var recId = String(record.id || '').trim();
+    if (!recId) return;
+    var masterId = refType + ':' + recId;
+    if (isDelete) {
+      deleteRowById(ss, SHEETS.MASTER_REF, { id: masterId });
+      return;
+    }
+    var refItem = {
+      id: masterId,
+      refType: refType,
+      code: record.code || record.nikOrNip || record.companyCode || record.accountNumber || record.requestNumber || recId,
+      name: record.name || record.companyName || record.accountName || record.nopol || recId,
+      category: record.category || record.group || record.jobTitle || record.accountType || record.vehicleClassification || refType,
+      companyName: record.companyName || record.ownerCompany || record.department || 'PT Transindo Logistik',
+      status: record.status || (record.isActive === false ? 'inactive' : 'active'),
+      updatedAt: new Date().toISOString()
+    };
+    upsertSingleRecord(ss, SHEETS.MASTER_REF, refItem);
+  } catch (ignore) {}
+}
+
+/**
  * Router Aksi Backend (Fokus Pada Item yang Dipilih Saja)
  */
 function processApiAction(payload) {
@@ -220,7 +305,7 @@ function processApiAction(payload) {
       return setupDatabase();
     }
     ensureAllSheetsReady(ss);
-    return { status: 'success', message: '16 Tabel Database siap digunakan.' };
+    return { status: 'success', message: 'Seluruh Tabel Database Utama & Master Referensi siap digunakan.' };
   }
 
   if (action === 'optimizeDatabase') {
@@ -251,8 +336,17 @@ function processApiAction(payload) {
     if (Array.isArray(data.sparepartInventory)) batchUpsertSheet(ss, SHEETS.SPAREPARTS, data.sparepartInventory);
     if (Array.isArray(data.sparepartMovements)) batchUpsertSheet(ss, SHEETS.SPAREPART_MOVEMENTS, data.sparepartMovements);
     if (Array.isArray(data.drivers)) batchUpsertSheet(ss, SHEETS.DRIVERS, data.drivers);
+    if (Array.isArray(data.adminStaff)) batchUpsertSheet(ss, SHEETS.ADMIN_STAFF, data.adminStaff);
+    if (Array.isArray(data.suppliers)) batchUpsertSheet(ss, SHEETS.SUPPLIERS, data.suppliers);
+    if (Array.isArray(data.expenseCategories)) batchUpsertSheet(ss, SHEETS.EXPENSE_CATEGORIES, data.expenseCategories);
+    if (Array.isArray(data.paymentMethods)) batchUpsertSheet(ss, SHEETS.PAYMENT_METHODS, data.paymentMethods);
     if (Array.isArray(data.accounts)) batchUpsertSheet(ss, SHEETS.ACCOUNTS, data.accounts);
+    if (Array.isArray(data.serviceTypes)) batchUpsertSheet(ss, SHEETS.SERVICE_TYPES, data.serviceTypes);
+    if (Array.isArray(data.simClasses)) batchUpsertSheet(ss, SHEETS.SIM_CLASSES, data.simClasses);
+    if (Array.isArray(data.nonRentalCategories)) batchUpsertSheet(ss, SHEETS.NON_RENTAL_CATEGORIES, data.nonRentalCategories);
     if (Array.isArray(data.companyDeposits)) batchUpsertSheet(ss, SHEETS.COMPANY_DEPOSITS, data.companyDeposits);
+    if (Array.isArray(data.depositTopUps)) batchUpsertSheet(ss, SHEETS.DEPOSIT_TOPUPS, data.depositTopUps);
+    if (Array.isArray(data.depositRequests)) batchUpsertSheet(ss, SHEETS.DEPOSIT_REQUESTS, data.depositRequests);
     if (Array.isArray(data.users)) batchUpsertSheet(ss, SHEETS.USERS, data.users);
     if (Array.isArray(data.auditLogs)) {
       batchUpsertSheet(ss, SHEETS.AUDIT_LOGS, data.auditLogs.slice(0, 250));
@@ -261,16 +355,16 @@ function processApiAction(payload) {
     invalidateFastCache();
     return {
       status: 'success',
-      message: 'Sinkronisasi Non-Destructive 16 Modul selesai (Data Aman & Hemat Sel)',
+      message: 'Sinkronisasi Non-Destructive Seluruh Tabel Utama & Master Referensi selesai (Data Aman & Hemat Sel)',
       timestamp: new Date().toISOString()
     };
   }
 
   // GRANULAR SINGLE-RECORD CRUD MAP (Fokus hanya pada 1 ID data yang dipilih)
   var granularMap = {
-    addVehicle: { sheet: SHEETS.VEHICLES, mode: 'upsert' },
-    updateVehicle: { sheet: SHEETS.VEHICLES, mode: 'upsert' },
-    deleteVehicle: { sheet: SHEETS.VEHICLES, mode: 'delete' },
+    addVehicle: { sheet: SHEETS.VEHICLES, mode: 'upsert', refType: 'vehicle' },
+    updateVehicle: { sheet: SHEETS.VEHICLES, mode: 'upsert', refType: 'vehicle' },
+    deleteVehicle: { sheet: SHEETS.VEHICLES, mode: 'delete', refType: 'vehicle' },
     addTax: { sheet: SHEETS.TAXES, mode: 'upsert' },
     updateTax: { sheet: SHEETS.TAXES, mode: 'upsert' },
     deleteTax: { sheet: SHEETS.TAXES, mode: 'delete' },
@@ -301,15 +395,42 @@ function processApiAction(payload) {
     addSparepartMovement: { sheet: SHEETS.SPAREPART_MOVEMENTS, mode: 'upsert' },
     updateSparepartMovement: { sheet: SHEETS.SPAREPART_MOVEMENTS, mode: 'upsert' },
     deleteSparepartMovement: { sheet: SHEETS.SPAREPART_MOVEMENTS, mode: 'delete' },
-    addDriver: { sheet: SHEETS.DRIVERS, mode: 'upsert' },
-    updateDriver: { sheet: SHEETS.DRIVERS, mode: 'upsert' },
-    deleteDriver: { sheet: SHEETS.DRIVERS, mode: 'delete' },
-    addAccount: { sheet: SHEETS.ACCOUNTS, mode: 'upsert' },
-    updateAccount: { sheet: SHEETS.ACCOUNTS, mode: 'upsert' },
-    deleteAccount: { sheet: SHEETS.ACCOUNTS, mode: 'delete' },
-    addCompanyDeposit: { sheet: SHEETS.COMPANY_DEPOSITS, mode: 'upsert' },
-    updateCompanyDeposit: { sheet: SHEETS.COMPANY_DEPOSITS, mode: 'upsert' },
-    deleteCompanyDeposit: { sheet: SHEETS.COMPANY_DEPOSITS, mode: 'delete' },
+    addDriver: { sheet: SHEETS.DRIVERS, mode: 'upsert', refType: 'driver' },
+    updateDriver: { sheet: SHEETS.DRIVERS, mode: 'upsert', refType: 'driver' },
+    deleteDriver: { sheet: SHEETS.DRIVERS, mode: 'delete', refType: 'driver' },
+    addAdminStaff: { sheet: SHEETS.ADMIN_STAFF, mode: 'upsert', refType: 'admin_staff' },
+    updateAdminStaff: { sheet: SHEETS.ADMIN_STAFF, mode: 'upsert', refType: 'admin_staff' },
+    deleteAdminStaff: { sheet: SHEETS.ADMIN_STAFF, mode: 'delete', refType: 'admin_staff' },
+    addSupplier: { sheet: SHEETS.SUPPLIERS, mode: 'upsert', refType: 'supplier' },
+    updateSupplier: { sheet: SHEETS.SUPPLIERS, mode: 'upsert', refType: 'supplier' },
+    deleteSupplier: { sheet: SHEETS.SUPPLIERS, mode: 'delete', refType: 'supplier' },
+    addExpenseCategory: { sheet: SHEETS.EXPENSE_CATEGORIES, mode: 'upsert', refType: 'expense_category' },
+    updateExpenseCategory: { sheet: SHEETS.EXPENSE_CATEGORIES, mode: 'upsert', refType: 'expense_category' },
+    deleteExpenseCategory: { sheet: SHEETS.EXPENSE_CATEGORIES, mode: 'delete', refType: 'expense_category' },
+    addPaymentMethod: { sheet: SHEETS.PAYMENT_METHODS, mode: 'upsert', refType: 'payment_method' },
+    updatePaymentMethod: { sheet: SHEETS.PAYMENT_METHODS, mode: 'upsert', refType: 'payment_method' },
+    deletePaymentMethod: { sheet: SHEETS.PAYMENT_METHODS, mode: 'delete', refType: 'payment_method' },
+    addAccount: { sheet: SHEETS.ACCOUNTS, mode: 'upsert', refType: 'account' },
+    updateAccount: { sheet: SHEETS.ACCOUNTS, mode: 'upsert', refType: 'account' },
+    deleteAccount: { sheet: SHEETS.ACCOUNTS, mode: 'delete', refType: 'account' },
+    addServiceType: { sheet: SHEETS.SERVICE_TYPES, mode: 'upsert', refType: 'service_type' },
+    updateServiceType: { sheet: SHEETS.SERVICE_TYPES, mode: 'upsert', refType: 'service_type' },
+    deleteServiceType: { sheet: SHEETS.SERVICE_TYPES, mode: 'delete', refType: 'service_type' },
+    addSimClass: { sheet: SHEETS.SIM_CLASSES, mode: 'upsert', refType: 'sim_class' },
+    updateSimClass: { sheet: SHEETS.SIM_CLASSES, mode: 'upsert', refType: 'sim_class' },
+    deleteSimClass: { sheet: SHEETS.SIM_CLASSES, mode: 'delete', refType: 'sim_class' },
+    addNonRentalCategory: { sheet: SHEETS.NON_RENTAL_CATEGORIES, mode: 'upsert', refType: 'non_rental_category' },
+    updateNonRentalCategory: { sheet: SHEETS.NON_RENTAL_CATEGORIES, mode: 'upsert', refType: 'non_rental_category' },
+    deleteNonRentalCategory: { sheet: SHEETS.NON_RENTAL_CATEGORIES, mode: 'delete', refType: 'non_rental_category' },
+    addCompanyDeposit: { sheet: SHEETS.COMPANY_DEPOSITS, mode: 'upsert', refType: 'company_deposit' },
+    updateCompanyDeposit: { sheet: SHEETS.COMPANY_DEPOSITS, mode: 'upsert', refType: 'company_deposit' },
+    deleteCompanyDeposit: { sheet: SHEETS.COMPANY_DEPOSITS, mode: 'delete', refType: 'company_deposit' },
+    addDepositTopUp: { sheet: SHEETS.DEPOSIT_TOPUPS, mode: 'upsert' },
+    updateDepositTopUp: { sheet: SHEETS.DEPOSIT_TOPUPS, mode: 'upsert' },
+    deleteDepositTopUp: { sheet: SHEETS.DEPOSIT_TOPUPS, mode: 'delete' },
+    addDepositRequest: { sheet: SHEETS.DEPOSIT_REQUESTS, mode: 'upsert' },
+    updateDepositRequest: { sheet: SHEETS.DEPOSIT_REQUESTS, mode: 'upsert' },
+    deleteDepositRequest: { sheet: SHEETS.DEPOSIT_REQUESTS, mode: 'delete' },
     addUser: { sheet: SHEETS.USERS, mode: 'upsert' },
     updateUser: { sheet: SHEETS.USERS, mode: 'upsert' },
     deleteUser: { sheet: SHEETS.USERS, mode: 'delete' },
@@ -321,10 +442,12 @@ function processApiAction(payload) {
     var target = granularMap[action];
     if (target.mode === 'upsert') {
       var upRes = upsertSingleRecord(ss, target.sheet, itemData);
+      if (target.refType) syncMasterRefIndex(ss, target.refType, itemData, false);
       invalidateFastCache();
       return { status: 'success', action: action, result: upRes };
     } else if (target.mode === 'delete') {
       var delRes = deleteRowById(ss, target.sheet, itemData);
+      if (target.refType) syncMasterRefIndex(ss, target.refType, itemData, true);
       invalidateFastCache();
       return { status: 'success', action: action, result: delRes };
     }
@@ -341,6 +464,7 @@ function processApiAction(payload) {
   if (action === 'topUpCompanyDeposit' && itemData) {
     if (itemData.updatedDeposit) upsertSingleRecord(ss, SHEETS.COMPANY_DEPOSITS, itemData.updatedDeposit);
     if (itemData.topUpTx) upsertSingleRecord(ss, SHEETS.FINANCE, itemData.topUpTx);
+    if (itemData.topUpRecord) upsertSingleRecord(ss, SHEETS.DEPOSIT_TOPUPS, itemData.topUpRecord);
     if (itemData.updatedAccount) upsertSingleRecord(ss, SHEETS.ACCOUNTS, itemData.updatedAccount);
     invalidateFastCache();
     return { status: 'success', action: action };
@@ -413,10 +537,20 @@ function getAllSpreadsheetDataFast(forceRefresh) {
       sparepartInventory: readSheetFast(ss, SHEETS.SPAREPARTS),
       sparepartMovements: readSheetFast(ss, SHEETS.SPAREPART_MOVEMENTS),
       drivers: readSheetFast(ss, SHEETS.DRIVERS),
+      adminStaff: readSheetFast(ss, SHEETS.ADMIN_STAFF),
+      suppliers: readSheetFast(ss, SHEETS.SUPPLIERS),
+      expenseCategories: readSheetFast(ss, SHEETS.EXPENSE_CATEGORIES),
+      paymentMethods: readSheetFast(ss, SHEETS.PAYMENT_METHODS),
       accounts: readSheetFast(ss, SHEETS.ACCOUNTS),
+      serviceTypes: readSheetFast(ss, SHEETS.SERVICE_TYPES),
+      simClasses: readSheetFast(ss, SHEETS.SIM_CLASSES),
+      nonRentalCategories: readSheetFast(ss, SHEETS.NON_RENTAL_CATEGORIES),
       companyDeposits: readSheetFast(ss, SHEETS.COMPANY_DEPOSITS),
+      depositTopUps: readSheetFast(ss, SHEETS.DEPOSIT_TOPUPS),
+      depositRequests: readSheetFast(ss, SHEETS.DEPOSIT_REQUESTS),
       users: readSheetFast(ss, SHEETS.USERS),
-      auditLogs: readSheetFast(ss, SHEETS.AUDIT_LOGS)
+      auditLogs: readSheetFast(ss, SHEETS.AUDIT_LOGS),
+      masterRef: readSheetFast(ss, SHEETS.MASTER_REF)
     }
   };
 
@@ -856,7 +990,89 @@ function resolveValueForHeader(record, h) {
     'Modul': record.module || '',
     'Aksi': record.action || '',
     'Keterangan Aktivitas': record.description || record.title || '',
-    'Detail Tambahan': record.targetName ? ((record.title || '') + ' [' + record.targetName + ']') : (record.title || '')
+    'Detail Tambahan': record.targetName ? ((record.title || '') + ' [' + record.targetName + ']') : (record.title || ''),
+
+    // Master Karyawan Administrasi (44S_Ops_AdminStaff)
+    'ID Staf': record.id,
+    'NIK / NIP': record.nikOrNip || record.nip || '',
+    'Jabatan': record.jobTitle || '',
+    'Peran / Role': record.role || record.jobTitle || '',
+    'Departemen': record.department || '',
+    'Email': record.email || '',
+    'Alamat': record.address || '',
+
+    // Master Supplier Peralatan & Sparepart (44S_Ops_Suppliers)
+    'ID Supplier': record.id,
+    'Kode Supplier': record.code || '',
+    'Nama Supplier / Toko': record.name || '',
+    'PIC / Kontak': record.contactPerson || '',
+    'No. Telepon / WA': record.phone || '',
+    'Bank': record.bankName || '',
+    'No. Rekening': record.accountNumber || '',
+    'Termin Pembayaran': record.paymentTerms || '',
+    'Status Aktif': record.isActive === false ? 'Non-Aktif' : 'Aktif',
+
+    // Master Jenis Pengeluaran (44S_Ops_ExpenseCategories)
+    'ID Kategori': record.id,
+    'Kode Pengeluaran': record.code || '',
+    'Nama Jenis Pengeluaran': record.name || '',
+    'Kelompok / Grup': record.group || '',
+    'Plafon / Standar Biaya (Rp)': record.defaultAmount !== undefined ? record.defaultAmount : 0,
+    'Wajib Nota?': record.requiresReceipt === false ? 'Tidak' : 'Ya',
+
+    // Master Metode Pembayaran (44S_Ops_PaymentMethods)
+    'ID Metode': record.id,
+    'Kode Metode': record.code || '',
+    'Nama Metode Pembayaran': record.name || '',
+    'ID Rekening Default': record.defaultAccountId || '',
+    'Nama Rekening Default': record.defaultAccountName || '',
+    'Wajib Bukti?': record.requiresProof === false ? 'Tidak' : 'Ya',
+
+    // Master Jenis Servis Bengkel (44S_Ops_ServiceTypes)
+    'ID Jenis Servis': record.id,
+    'Kode Servis': record.code || '',
+    'Nama Pekerjaan Servis': record.name || '',
+    'Kategori Servis': record.category || '',
+    'Interval KM': record.defaultIntervalKm !== undefined ? record.defaultIntervalKm : 0,
+    'Interval Hari': record.defaultIntervalDays !== undefined ? record.defaultIntervalDays : 0,
+    'Suku Cadang Umum': Array.isArray(record.commonParts) ? record.commonParts.join(', ') : (record.commonParts || ''),
+
+    // Master Golongan SIM Pengemudi (44S_Ops_SimClasses)
+    'ID Golongan SIM': record.id,
+    'Kode SIM': record.code || '',
+    'Nama Golongan SIM': record.name || '',
+    'Klasifikasi Kendaraan': record.vehicleClassification || '',
+    'Usia Minimal': record.minAge !== undefined ? record.minAge : 20,
+    'Masa Berlaku (Thn)': record.validityYears !== undefined ? record.validityYears : 5,
+    'Armada Diizinkan': record.permittedVehicles || '',
+
+    // Master Pemasukan Non-Sewa (44S_Ops_NonRentalCategories)
+    'ID Kategori Non-Sewa': record.id,
+    'Kode Kategori': record.code || '',
+    'Nama Pemasukan Non-Sewa': record.name || '',
+    'Tarif Acuan (Rp)': record.defaultAmount !== undefined ? record.defaultAmount : 0,
+
+    // Riwayat Top-Up Deposit Perusahaan (44S_Ops_DepositTopUps)
+    'ID Top-Up': record.id,
+    'ID Perusahaan': record.companyId || '',
+    'Nama Perusahaan': record.companyName || '',
+    'Jumlah Top-Up (Rp)': record.amount !== undefined ? record.amount : 0,
+    'No. Bukti Transfer': record.transferProofNumber || '',
+    'ID Rekening Tujuan': record.bankAccountId || '',
+    'Nama Rekening Tujuan': record.bankAccountName || '',
+    'Metode Pembayaran': record.paymentMethod || '',
+
+    // Pengajuan Deposit Perusahaan (44S_Ops_DepositRequests)
+    'ID Pengajuan': record.id,
+    'No. Pengajuan': record.requestNumber || '',
+    'Tanggal Pengajuan': record.requestDate || record.date || '',
+    'Kode Perusahaan': record.companyCode || '',
+    'Jumlah Diajukan (Rp)': record.amount !== undefined ? record.amount : 0,
+    'Keperluan': record.purpose || '',
+    'Pemohon / PIC': record.applicantName || '',
+    'No. HP Pemohon': record.applicantPhone || '',
+    'Urgensi': record.urgencyLevel || 'normal',
+    'Disetujui Oleh': record.approvedBy || ''
   };
 
   if (h === 'ID Unit' && record.vehicleId && !record.nopol && !record.brand) {
@@ -1045,10 +1261,21 @@ function resolveSheetName(moduleKey) {
     sparepartInventory: SHEETS.SPAREPARTS,
     sparepartMovements: SHEETS.SPAREPART_MOVEMENTS,
     drivers: SHEETS.DRIVERS,
+    adminStaff: SHEETS.ADMIN_STAFF,
+    suppliers: SHEETS.SUPPLIERS,
+    equipmentSuppliers: SHEETS.SUPPLIERS,
+    expenseCategories: SHEETS.EXPENSE_CATEGORIES,
+    paymentMethods: SHEETS.PAYMENT_METHODS,
     accounts: SHEETS.ACCOUNTS,
+    serviceTypes: SHEETS.SERVICE_TYPES,
+    simClasses: SHEETS.SIM_CLASSES,
+    nonRentalCategories: SHEETS.NON_RENTAL_CATEGORIES,
     companyDeposits: SHEETS.COMPANY_DEPOSITS,
+    depositTopUps: SHEETS.DEPOSIT_TOPUPS,
+    depositRequests: SHEETS.DEPOSIT_REQUESTS,
     users: SHEETS.USERS,
-    auditLogs: SHEETS.AUDIT_LOGS
+    auditLogs: SHEETS.AUDIT_LOGS,
+    masterRef: SHEETS.MASTER_REF
   };
   return map[moduleKey] || null;
 }
@@ -1103,7 +1330,7 @@ export const GAS_SETUP_GS = `/**
  * (AMAN DATA RIIL — TANPA PERINTAH HAPUS SEMUA DATA)
  * ============================================================================
  * Fungsi Utama Setup.gs:
- * 1. setupDatabase()                : Menyiapkan struktur 16 Sheet tanpa menghapus data yang sudah ada.
+ * 1. setupDatabase()                : Menyiapkan struktur 26 Sheet Utama & Master Referensi tanpa menghapus data yang sudah ada.
  * 2. optimizeAllDatabaseSheets()    : Memangkas baris/kolom kosong di bawah data terakhir (Hemat Kuota 10 Juta Sel).
  * 3. getDatabaseHealthReport()      : Mengukur pemakaian sel database & performa anti-lemot.
  * 4. setupDailyTrigger()            : Mengaktifkan cron job harian (jam 07:00 WIB) untuk kompresi sel kosong & alarm pajak.
@@ -1114,7 +1341,7 @@ function onOpen() {
   try {
     var ui = SpreadsheetApp.getUi();
     ui.createMenu('🚛 44S Ops_pro Admin')
-      .addItem('1. Inisialisasi Struktur 16 Sheet Database (Aman Data)', 'setupDatabase')
+      .addItem('1. Inisialisasi Struktur 26 Sheet Database & Master Referensi (Aman Data)', 'setupDatabase')
       .addItem('2. Optimasi & Pangkas Sel Kosong (Anti-Lemot)', 'optimizeAllDatabaseSheets')
       .addSeparator()
       .addItem('3. Cek Kesehatan & Kuota Sel Database', 'showDatabaseHealthDialog')
@@ -1124,15 +1351,11 @@ function onOpen() {
 }
 
 /**
- * 1. INISIALISASI STRUKTUR 16 SHEET (TANPA MENGHAPUS DATA YANG SUDAH ADA)
+ * 1. INISIALISASI STRUKTUR 26 SHEET UTAMA & MASTER REFERENSI (TANPA MENGHAPUS DATA YANG SUDAH ADA)
  */
 function setupDatabase() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   ensureAllSheetsReady(ss);
-
-  getOrCreateSheetWithSchema(ss, SHEETS.MASTER_REF, [
-    'refType', 'code', 'name', 'companyName', 'status', 'updatedAt'
-  ]);
 
   for (var key in SHEETS) {
     var sheetName = SHEETS[key];

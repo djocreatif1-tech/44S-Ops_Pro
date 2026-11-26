@@ -143,11 +143,44 @@ const FIELD_ALIAS_MAP: Record<string, string[]> = {
   partCode: ['partcode', 'kodepart', 'kodesparepart'],
   partName: ['partname', 'namapart', 'namasparepart'],
   stockQty: ['stockqty', 'stok', 'qty'],
-  name: ['name', 'fullname', 'nama', 'namalengkap'],
-  phone: ['phone', 'nowhatsapphp', 'nohp', 'telepon', 'whatsapp'],
+  name: ['name', 'fullname', 'nama', 'namalengkap', 'namasuppliertoko', 'namajenispengeluaran', 'namametodepembayaran', 'namapekerjaanservis', 'namagolongansim', 'namapemasukannonsewa'],
+  phone: ['phone', 'nowhatsapphp', 'nohp', 'telepon', 'whatsapp', 'noteleponwa'],
   simType: ['simtype', 'golongansim', 'simclass', 'jenissim'],
   simExpiryDate: ['simexpirydate', 'masaberlakusim', 'simexpiry', 'expirysim'],
-  assignedVehicle: ['assignedvehicle', 'unitpegangan', 'armadapegangan']
+  assignedVehicle: ['assignedvehicle', 'unitpegangan', 'armadapegangan'],
+  nikOrNip: ['nikornip', 'niknip', 'nip', 'nik'],
+  jobTitle: ['jobtitle', 'jabatan'],
+  department: ['department', 'departemen', 'divisi'],
+  email: ['email', 'surel'],
+  address: ['address', 'alamat'],
+  joinDate: ['joindate', 'tanggalbergabung', 'tglgabung'],
+  code: ['code', 'kodesupplier', 'kodepengeluaran', 'kodemetode', 'kodeservis', 'kodesim', 'kodekategori'],
+  category: ['category', 'kategori', 'kategoriservis'],
+  contactPerson: ['contactperson', 'pickontak', 'pic', 'picname'],
+  bankName: ['bankname', 'bank', 'bankpenyedia'],
+  accountNumber: ['accountnumber', 'norekening', 'nomorrekening'],
+  paymentTerms: ['paymentterms', 'terminpembayaran', 'termin'],
+  group: ['group', 'kelompokgrup', 'kelompok', 'grup'],
+  defaultAmount: ['defaultamount', 'plafonstandarbiayarp', 'tarifacuanrp', 'plafon', 'tarifacuan'],
+  defaultAccountId: ['defaultaccountid', 'idrekeningdefault'],
+  defaultAccountName: ['defaultaccountname', 'namarekeningdefault'],
+  defaultIntervalKm: ['defaultintervalkm', 'intervalkm'],
+  defaultIntervalDays: ['defaultintervaldays', 'intervalhari'],
+  estimatedCost: ['estimatedcost', 'estimasibiayarp'],
+  vehicleClassification: ['vehicleclassification', 'klasifikasikendaraan'],
+  minAge: ['minage', 'usiaminimal'],
+  validityYears: ['validityyears', 'masaberlakuthn'],
+  permittedVehicles: ['permittedvehicles', 'armadadiizinkan'],
+  transferProofNumber: ['transferproofnumber', 'nobuktitransfer'],
+  bankAccountId: ['bankaccountid', 'idrekeningtujuan'],
+  bankAccountName: ['bankaccountname', 'namarekeningtujuan'],
+  requestNumber: ['requestnumber', 'nopengajuan'],
+  requestDate: ['requestdate', 'tanggalpengajuan'],
+  purpose: ['purpose', 'keperluan'],
+  applicantName: ['applicantname', 'pemohonpic', 'pemohon'],
+  applicantPhone: ['applicantphone', 'nohppemohon'],
+  urgencyLevel: ['urgencylevel', 'urgensi'],
+  approvedBy: ['approvedby', 'disetujuioleh']
 };
 
 const DATE_FIELDS = [
@@ -161,7 +194,9 @@ const DATE_FIELDS = [
   'serviceDate',
   'nextServiceDate',
   'departureDate',
-  'simExpiryDate'
+  'simExpiryDate',
+  'joinDate',
+  'requestDate'
 ];
 
 export function normalizeSingleRecord(raw: any, index: number, prefix = 'REC'): any {
@@ -380,6 +415,49 @@ export function normalizeSingleRecord(raw: any, index: number, prefix = 'REC'): 
   return merged;
 }
 
+export const DELETED_IDS_STORAGE_KEY = 'fleetops_deleted_ids_v1';
+
+export function getDeletedRecordIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(DELETED_IDS_STORAGE_KEY);
+    if (!raw) return new Set<string>();
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return new Set<string>(parsed.map((id) => String(id).trim()).filter(Boolean));
+    }
+    return new Set<string>();
+  } catch {
+    return new Set<string>();
+  }
+}
+
+export function markRecordDeleted(id: string) {
+  try {
+    const cleanId = String(id || '').trim();
+    if (!cleanId) return;
+    const set = getDeletedRecordIds();
+    set.add(cleanId);
+    const arr = Array.from(set).slice(-1500);
+    localStorage.setItem(DELETED_IDS_STORAGE_KEY, JSON.stringify(arr));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+export function unmarkRecordDeleted(id: string) {
+  try {
+    const cleanId = String(id || '').trim();
+    if (!cleanId) return;
+    const set = getDeletedRecordIds();
+    if (set.has(cleanId)) {
+      set.delete(cleanId);
+      localStorage.setItem(DELETED_IDS_STORAGE_KEY, JSON.stringify(Array.from(set)));
+    }
+  } catch {
+    // ignore storage errors
+  }
+}
+
 export function stripDummyRecords<T>(items: T[], prefix = 'REC'): T[] {
   if (!Array.isArray(items)) return [];
   const seenIds = new Set<string>();
@@ -387,8 +465,14 @@ export function stripDummyRecords<T>(items: T[], prefix = 'REC'): T[] {
   const isVehiclePrefix = prefix === 'VH' || prefix === 'VEHI';
 
   items.forEach((rawItem: any, idx: number) => {
+    if (rawItem && typeof rawItem.id === 'string' && rawItem.id.startsWith('__SYS_MASTER_SYNC_')) {
+      return;
+    }
     const norm = normalizeSingleRecord(rawItem, idx, prefix);
     if (!norm) return;
+    if (typeof norm.id === 'string' && norm.id.startsWith('__SYS_MASTER_SYNC_')) {
+      return;
+    }
 
     // Eliminate corrupted ghost vehicle rows that have neither plate number nor brand
     if (isVehiclePrefix) {
@@ -414,6 +498,101 @@ export function stripDummyRecords<T>(items: T[], prefix = 'REC'): T[] {
   });
 
   return result;
+}
+
+/**
+ * Non-destructive merge between local records and cloud (Google Spreadsheet) records.
+ * - Preserves all local records that are not yet in the cloud spreadsheet (and returns them in unsyncedLocal so they can be pushed automatically).
+ * - Filters out any record IDs explicitly deleted by the user.
+ * - Ensures local data entered by the user is NEVER lost during refresh, update, or background polling.
+ */
+export function mergeLocalWithCloudArray<T extends { id: string }>(
+  localItems: T[],
+  cloudItems: T[],
+  prefix = 'REC'
+): { merged: T[]; unsyncedLocal: T[] } {
+  const deletedSet = getDeletedRecordIds();
+  const cleanLocal = stripDummyRecords<T>(Array.isArray(localItems) ? localItems : [], prefix).filter(
+    (item) => !deletedSet.has(String(item.id || '').trim())
+  );
+  const cleanCloud = stripDummyRecords<T>(Array.isArray(cloudItems) ? cloudItems : [], prefix).filter(
+    (item) => !deletedSet.has(String(item.id || '').trim())
+  );
+
+  // If cloud sheet is empty, keep all local items and mark all of them as unsyncedLocal to push to spreadsheet
+  if (cleanCloud.length === 0) {
+    return {
+      merged: cleanLocal,
+      unsyncedLocal: cleanLocal
+    };
+  }
+
+  const cloudMap = new Map<string, T>();
+  for (const cItem of cleanCloud) {
+    const cid = String(cItem.id || '').trim();
+    if (cid) {
+      cloudMap.set(cid, cItem);
+    }
+  }
+
+  const localMap = new Map<string, T>();
+  for (const lItem of cleanLocal) {
+    const lid = String(lItem.id || '').trim();
+    if (lid) {
+      localMap.set(lid, lItem);
+    }
+  }
+
+  const unsyncedLocal: T[] = [];
+  const mergedList: T[] = [];
+  const addedIds = new Set<string>();
+
+  // 1. Add all local items that are not in cloud yet at the top so user's newly added local items stay visible & get synced
+  for (const lItem of cleanLocal) {
+    const lid = String(lItem.id || '').trim();
+    if (!lid || addedIds.has(lid)) continue;
+    // Skip synthetic row fallback IDs if cloud already has real records
+    if (/^[A-Z]+-ROW-\d+$/i.test(lid) && cleanCloud.length > 0 && !cloudMap.has(lid)) {
+      continue;
+    }
+    if (!cloudMap.has(lid)) {
+      mergedList.push(lItem);
+      unsyncedLocal.push(lItem);
+      addedIds.add(lid);
+    }
+  }
+
+  // 2. Add all cloud items, enriched with any non-empty local fields
+  for (const cItem of cleanCloud) {
+    const cid = String(cItem.id || '').trim();
+    if (!cid || addedIds.has(cid)) continue;
+    const matchingLocal = localMap.get(cid);
+    if (matchingLocal) {
+      const combined: Record<string, any> = { ...matchingLocal, ...cItem };
+      // Preserve local fields if cloud returned empty or placeholder '-'
+      for (const [k, lVal] of Object.entries(matchingLocal)) {
+        const cVal = (cItem as any)[k];
+        if (
+          (cVal === undefined || cVal === null || cVal === '' || cVal === '-') &&
+          lVal !== undefined &&
+          lVal !== null &&
+          lVal !== '' &&
+          lVal !== '-'
+        ) {
+          combined[k] = lVal;
+        }
+      }
+      mergedList.push(combined as T);
+    } else {
+      mergedList.push(cItem);
+    }
+    addedIds.add(cid);
+  }
+
+  return {
+    merged: mergedList,
+    unsyncedLocal
+  };
 }
 
 function readStoredArray<T>(key: string, fallback: T[]): T[] {
