@@ -31,6 +31,7 @@ import { TablePagination } from '../Common/TablePagination';
 import { ReceiptUploadField } from '../Common/ReceiptUploadField';
 import { ModuleAnalyticsPanel } from '../Common/ModuleAnalyticsPanel';
 import { BarChart3, ListFilter } from 'lucide-react';
+import { resolveDisplayReceiptUrl } from '../../utils/imageCompressor';
 
 interface TaxManagerProps {
   taxes: TaxRecord[];
@@ -947,19 +948,30 @@ export const TaxManager: React.FC<TaxManagerProps> = ({
               </button>
             </div>
             <div className="p-4 bg-slate-100 flex items-center justify-center min-h-[300px] max-h-[480px] overflow-auto">
-              {inspectedReceiptTax.receiptProofUrl?.startsWith('data:application/pdf') ? (
-                <iframe
-                  src={inspectedReceiptTax.receiptProofUrl}
-                  title="Nota Pajak PDF"
-                  className="w-full h-[420px] rounded-lg border border-slate-200 bg-white"
-                />
-              ) : inspectedReceiptTax.receiptProofUrl ? (
-                <img
-                  src={inspectedReceiptTax.receiptProofUrl}
-                  alt="Nota Pajak"
-                  className="max-w-full max-h-[440px] object-contain rounded-lg shadow-sm"
-                />
-              ) : (
+              {inspectedReceiptTax.receiptProofUrl ? (() => {
+                const resolvedUrl = resolveDisplayReceiptUrl(inspectedReceiptTax.receiptProofUrl, {
+                  title: 'BUKTI PEMBAYARAN PAJAK / KIR',
+                  subtitle: inspectedReceiptTax.documentType,
+                  receiptNumber: inspectedReceiptTax.id,
+                  date: formatDateIndo(inspectedReceiptTax.lastPaymentDate || inspectedReceiptTax.dueDate),
+                  amountText: formatRupiah(inspectedReceiptTax.amount),
+                  nopol: inspectedReceiptTax.nopol,
+                  driverName: inspectedReceiptTax.agentOrSamsat || 'Samsat / Dishub'
+                });
+                return resolvedUrl.startsWith('data:application/pdf') ? (
+                  <iframe
+                    src={resolvedUrl}
+                    title="Nota Pajak PDF"
+                    className="w-full h-[420px] rounded-lg border border-slate-200 bg-white"
+                  />
+                ) : (
+                  <img
+                    src={resolvedUrl}
+                    alt="Nota Pajak"
+                    className="max-w-full max-h-[440px] object-contain rounded-lg shadow-sm bg-white"
+                  />
+                );
+              })() : (
                 <div className="text-center text-slate-400 text-xs">
                   <FileText className="w-8 h-8 mx-auto mb-2" />
                   Belum ada nota terlampir.

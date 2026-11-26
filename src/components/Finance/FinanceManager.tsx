@@ -73,6 +73,7 @@ import { ModuleFilterExportBar } from '../Common/ModuleFilterExportBar';
 import { getRolePermissions } from '../../utils/permissions';
 import { RoleRestrictedBanner } from '../Common/RoleRestrictedBanner';
 import { SAMPLE_RECEIPT_IMAGE } from '../../data/initialData';
+import { compressReceiptFile, resolveDisplayReceiptUrl } from '../../utils/imageCompressor';
 import { TablePagination } from '../Common/TablePagination';
 import { PrintOutPreviewStage } from '../Common/PrintPreviewControls';
 import { EquipmentCashFlowManager } from './EquipmentCashFlowManager';
@@ -479,20 +480,19 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({
   const verifiedReceiptsCount = safeFinances.filter(f => f.type === 'expense' && f.receiptProofUrl).length;
 
   // Receipt Upload & Preview Handlers
-  const handleReceiptUpload = (e: React.ChangeEvent<HTMLInputElement>, isEdit = false) => {
+  const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>, isEdit = false) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
       showCenterCrudNotification('Format file tidak didukung. Harap pilih gambar/foto nota (JPG, PNG, WebP) atau PDF.', 'error');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      showCenterCrudNotification('Ukuran file maksimal 5 MB.', 'error');
+    if (file.size > 10 * 1024 * 1024) {
+      showCenterCrudNotification('Ukuran file maksimal 10 MB.', 'error');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const dataUrl = ev.target?.result as string;
+    try {
+      const dataUrl = await compressReceiptFile(file);
       if (isEdit) {
         setEditTxData(prev => ({ ...prev, receiptProofUrl: dataUrl }));
         setEditFormReceiptError(null);
@@ -500,9 +500,11 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({
         setFormData(prev => ({ ...prev, receiptProofUrl: dataUrl }));
         setFormReceiptError(null);
       }
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
+    } catch {
+      showCenterCrudNotification('Gagal memproses file bukti nota.', 'error');
+    } finally {
+      e.target.value = '';
+    }
   };
 
   const handleUseSampleReceipt = (isEdit = false) => {
@@ -515,23 +517,25 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({
     }
   };
 
-  const handleTopUpReceiptUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTopUpReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
       showCenterCrudNotification('Format file tidak didukung. Harap pilih gambar atau PDF.', 'error');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      showCenterCrudNotification('Ukuran file maksimal 5 MB.', 'error');
+    if (file.size > 10 * 1024 * 1024) {
+      showCenterCrudNotification('Ukuran file maksimal 10 MB.', 'error');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setTopUpData(prev => ({ ...prev, receiptProofUrl: ev.target?.result as string }));
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
+    try {
+      const dataUrl = await compressReceiptFile(file);
+      setTopUpData(prev => ({ ...prev, receiptProofUrl: dataUrl }));
+    } catch {
+      showCenterCrudNotification('Gagal memproses file bukti transfer.', 'error');
+    } finally {
+      e.target.value = '';
+    }
   };
 
   // Vehicle Select in Form
@@ -3153,22 +3157,31 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({
                 </div>
 
                 <div className="h-72 sm:h-96 w-full border border-slate-200 rounded-xl overflow-auto bg-slate-900/5 flex items-center justify-center p-2 relative group">
-                  {inspectedReceiptTx.receiptProofUrl ? (
-                    inspectedReceiptTx.receiptProofUrl.startsWith('data:application/pdf') ? (
+                  {inspectedReceiptTx.receiptProofUrl ? (() => {
+                    const resolvedUrl = resolveDisplayReceiptUrl(inspectedReceiptTx.receiptProofUrl, {
+                      title: 'BUKTI NOTA TRANSAKSI KAS',
+                      subtitle: inspectedReceiptTx.category,
+                      receiptNumber: inspectedReceiptTx.receiptNumber || inspectedReceiptTx.id,
+                      date: formatDateIndo(inspectedReceiptTx.date),
+                      amountText: formatRupiah(inspectedReceiptTx.amount),
+                      nopol: inspectedReceiptTx.nopol,
+                      driverName: inspectedReceiptTx.driverName
+                    });
+                    return resolvedUrl.startsWith('data:application/pdf') ? (
                       <iframe
-                        src={inspectedReceiptTx.receiptProofUrl}
+                        src={resolvedUrl}
                         title="Pratinjau Nota PDF"
                         className="w-full h-full rounded border border-slate-200 bg-white"
                       />
                     ) : (
                       <img
-                        src={inspectedReceiptTx.receiptProofUrl}
+                        src={resolvedUrl}
                         alt="Nota Fisik"
                         style={{ transform: `scale(${receiptZoom})`, transformOrigin: 'center center' }}
-                        className="max-h-full max-w-full object-contain rounded shadow-xs transition-transform duration-150"
+                        className="max-h-full max-w-full object-contain rounded shadow-xs transition-transform duration-150 bg-white"
                       />
-                    )
-                  ) : (
+                    );
+                  })() : (
                     <div className="text-center p-6 text-slate-400">
                       <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
                       <p className="text-xs font-semibold">Bukti nota belum diunggah untuk transaksi ini.</p>

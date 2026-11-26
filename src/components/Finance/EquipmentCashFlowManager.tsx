@@ -49,6 +49,7 @@ import { SAMPLE_RECEIPT_IMAGE } from '../../data/initialData';
 import { ModuleAnalyticsPanel } from '../Common/ModuleAnalyticsPanel';
 import { BarChart3, ListFilter } from 'lucide-react';
 import { confirmDelete } from '../../utils/dialogService';
+import { compressReceiptFile, resolveDisplayReceiptUrl } from '../../utils/imageCompressor';
 
 interface EquipmentCashFlowManagerProps {
   equipmentList: EquipmentCashFlow[];
@@ -231,29 +232,32 @@ export const EquipmentCashFlowManager: React.FC<EquipmentCashFlowManagerProps> =
     setIsModalOpen(true);
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      setFormError('Harap unggah file gambar (JPG, PNG, WebP) nota fisik.');
+    if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
+      setFormError('Harap unggah file gambar (JPG, PNG, WebP) atau PDF nota fisik.');
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
-      setFormError('Ukuran file maksimal 2 MB.');
+    if (file.size > 10 * 1024 * 1024) {
+      setFormError('Ukuran file maksimal 10 MB.');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
+    try {
+      const compressed = await compressReceiptFile(file);
       setFormData((prev) => ({
         ...prev,
-        receiptProofUrl: event.target?.result as string
+        receiptProofUrl: compressed
       }));
       setFormError(null);
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      setFormError('Gagal memproses file nota fisik.');
+    } finally {
+      e.target.value = '';
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -1249,10 +1253,18 @@ export const EquipmentCashFlowManager: React.FC<EquipmentCashFlowManagerProps> =
 
             <div className="p-4 bg-slate-100 flex items-center justify-center min-h-[320px] max-h-[500px] overflow-auto">
               <img
-                src={inspectedReceipt.receiptProofUrl}
+                src={resolveDisplayReceiptUrl(inspectedReceipt.receiptProofUrl, {
+                  title: 'NOTA BELANJA PERALATAN ARMADA',
+                  subtitle: inspectedReceipt.equipmentName,
+                  receiptNumber: inspectedReceipt.receiptNumber || inspectedReceipt.id,
+                  date: formatDateIndo(inspectedReceipt.date),
+                  amountText: formatRupiah(inspectedReceipt.totalAmount),
+                  nopol: inspectedReceipt.nopol,
+                  driverName: inspectedReceipt.recipientName || inspectedReceipt.supplierOrStore
+                })}
                 alt="Nota Fisik"
                 style={{ transform: `scale(${receiptZoom})` }}
-                className="max-w-full max-h-[460px] object-contain transition-transform duration-150 shadow-md rounded-lg"
+                className="max-w-full max-h-[460px] object-contain transition-transform duration-150 shadow-md rounded-lg bg-white"
               />
             </div>
 

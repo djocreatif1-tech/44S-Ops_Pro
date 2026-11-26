@@ -56,7 +56,8 @@ var SHEETS = {
   DEPOSIT_REQUESTS: '44S_Ops_DepositRequests',
   USERS: '44S_Ops_Users',
   AUDIT_LOGS: '44S_Ops_AuditLogs',
-  MASTER_REF: '44S_Ops_MasterRef'
+  MASTER_REF: '44S_Ops_MasterRef',
+  RECEIPT_VAULT: '44S_Ops_ReceiptVault'
 };
 
 var SHEET_SCHEMAS = {};
@@ -195,6 +196,9 @@ SHEET_SCHEMAS[SHEETS.AUDIT_LOGS] = [
 ];
 SHEET_SCHEMAS[SHEETS.MASTER_REF] = [
   'id', 'refType', 'code', 'name', 'category', 'companyName', 'status', 'updatedAt', 'rawJson'
+];
+SHEET_SCHEMAS[SHEETS.RECEIPT_VAULT] = [
+  'id', 'recordId', 'fieldKey', 'chunk1', 'chunk2', 'chunk3', 'chunk4', 'updatedAt'
 ];
 
 /**
@@ -518,39 +522,40 @@ function getAllSpreadsheetDataFast(forceRefresh) {
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   ensureAllSheetsReady(ss);
+  var vaultMap = loadReceiptVaultMap(ss);
 
   var responsePayload = {
     status: 'success',
     fromCache: false,
     timestamp: new Date().toISOString(),
     data: {
-      vehicles: readSheetFast(ss, SHEETS.VEHICLES),
-      taxes: readSheetFast(ss, SHEETS.TAXES),
-      fuelLogs: readSheetFast(ss, SHEETS.FUEL),
-      finances: readSheetFast(ss, SHEETS.FINANCE),
-      pocketFlows: readSheetFast(ss, SHEETS.POCKET_FLOWS),
-      equipmentList: readSheetFast(ss, SHEETS.EQUIPMENT_FLOWS),
-      equipmentFlows: readSheetFast(ss, SHEETS.EQUIPMENT_FLOWS),
-      tripSheets: readSheetFast(ss, SHEETS.TRIP_SHEETS),
-      timesheets: readSheetFast(ss, SHEETS.TIMESHEETS),
-      maintenance: readSheetFast(ss, SHEETS.MAINTENANCE),
-      sparepartInventory: readSheetFast(ss, SHEETS.SPAREPARTS),
-      sparepartMovements: readSheetFast(ss, SHEETS.SPAREPART_MOVEMENTS),
-      drivers: readSheetFast(ss, SHEETS.DRIVERS),
-      adminStaff: readSheetFast(ss, SHEETS.ADMIN_STAFF),
-      suppliers: readSheetFast(ss, SHEETS.SUPPLIERS),
-      expenseCategories: readSheetFast(ss, SHEETS.EXPENSE_CATEGORIES),
-      paymentMethods: readSheetFast(ss, SHEETS.PAYMENT_METHODS),
-      accounts: readSheetFast(ss, SHEETS.ACCOUNTS),
-      serviceTypes: readSheetFast(ss, SHEETS.SERVICE_TYPES),
-      simClasses: readSheetFast(ss, SHEETS.SIM_CLASSES),
-      nonRentalCategories: readSheetFast(ss, SHEETS.NON_RENTAL_CATEGORIES),
-      companyDeposits: readSheetFast(ss, SHEETS.COMPANY_DEPOSITS),
-      depositTopUps: readSheetFast(ss, SHEETS.DEPOSIT_TOPUPS),
-      depositRequests: readSheetFast(ss, SHEETS.DEPOSIT_REQUESTS),
-      users: readSheetFast(ss, SHEETS.USERS),
-      auditLogs: readSheetFast(ss, SHEETS.AUDIT_LOGS),
-      masterRef: readSheetFast(ss, SHEETS.MASTER_REF)
+      vehicles: readSheetFast(ss, SHEETS.VEHICLES, vaultMap),
+      taxes: readSheetFast(ss, SHEETS.TAXES, vaultMap),
+      fuelLogs: readSheetFast(ss, SHEETS.FUEL, vaultMap),
+      finances: readSheetFast(ss, SHEETS.FINANCE, vaultMap),
+      pocketFlows: readSheetFast(ss, SHEETS.POCKET_FLOWS, vaultMap),
+      equipmentList: readSheetFast(ss, SHEETS.EQUIPMENT_FLOWS, vaultMap),
+      equipmentFlows: readSheetFast(ss, SHEETS.EQUIPMENT_FLOWS, vaultMap),
+      tripSheets: readSheetFast(ss, SHEETS.TRIP_SHEETS, vaultMap),
+      timesheets: readSheetFast(ss, SHEETS.TIMESHEETS, vaultMap),
+      maintenance: readSheetFast(ss, SHEETS.MAINTENANCE, vaultMap),
+      sparepartInventory: readSheetFast(ss, SHEETS.SPAREPARTS, vaultMap),
+      sparepartMovements: readSheetFast(ss, SHEETS.SPAREPART_MOVEMENTS, vaultMap),
+      drivers: readSheetFast(ss, SHEETS.DRIVERS, vaultMap),
+      adminStaff: readSheetFast(ss, SHEETS.ADMIN_STAFF, vaultMap),
+      suppliers: readSheetFast(ss, SHEETS.SUPPLIERS, vaultMap),
+      expenseCategories: readSheetFast(ss, SHEETS.EXPENSE_CATEGORIES, vaultMap),
+      paymentMethods: readSheetFast(ss, SHEETS.PAYMENT_METHODS, vaultMap),
+      accounts: readSheetFast(ss, SHEETS.ACCOUNTS, vaultMap),
+      serviceTypes: readSheetFast(ss, SHEETS.SERVICE_TYPES, vaultMap),
+      simClasses: readSheetFast(ss, SHEETS.SIM_CLASSES, vaultMap),
+      nonRentalCategories: readSheetFast(ss, SHEETS.NON_RENTAL_CATEGORIES, vaultMap),
+      companyDeposits: readSheetFast(ss, SHEETS.COMPANY_DEPOSITS, vaultMap),
+      depositTopUps: readSheetFast(ss, SHEETS.DEPOSIT_TOPUPS, vaultMap),
+      depositRequests: readSheetFast(ss, SHEETS.DEPOSIT_REQUESTS, vaultMap),
+      users: readSheetFast(ss, SHEETS.USERS, vaultMap),
+      auditLogs: readSheetFast(ss, SHEETS.AUDIT_LOGS, vaultMap),
+      masterRef: readSheetFast(ss, SHEETS.MASTER_REF, vaultMap)
     }
   };
 
@@ -570,7 +575,54 @@ function invalidateFastCache() {
   } catch (ignore) {}
 }
 
-function readSheetFast(ss, sheetName) {
+function loadReceiptVaultMap(ss) {
+  var map = {};
+  try {
+    var sheet = ss.getSheetByName(SHEETS.RECEIPT_VAULT);
+    if (!sheet || sheet.getLastRow() <= 1) return map;
+    var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 7).getValues();
+    for (var i = 0; i < rows.length; i++) {
+      var vKey = String(rows[i][0] || '').trim();
+      if (!vKey) continue;
+      var combined = String(rows[i][3] || '') + String(rows[i][4] || '') + String(rows[i][5] || '') + String(rows[i][6] || '');
+      if (combined) {
+        map[vKey] = combined;
+      }
+    }
+  } catch (ignore) {}
+  return map;
+}
+
+function saveToReceiptVault(ss, recordId, fieldKey, fullDataUrl) {
+  try {
+    if (!ss || !fullDataUrl) return fullDataUrl;
+    var vaultKey = String(recordId || 'REC').trim() + '__' + String(fieldKey || 'receiptProofUrl').trim();
+    var headers = SHEET_SCHEMAS[SHEETS.RECEIPT_VAULT];
+    var sheet = getOrCreateSheetWithSchema(ss, SHEETS.RECEIPT_VAULT, headers);
+    var c1 = fullDataUrl.substring(0, 40000);
+    var c2 = fullDataUrl.substring(40000, 80000);
+    var c3 = fullDataUrl.substring(80000, 120000);
+    var c4 = fullDataUrl.substring(120000, 160000);
+    var rowVals = [vaultKey, String(recordId || ''), String(fieldKey || ''), c1, c2, c3, c4, new Date().toISOString()];
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      for (var i = 0; i < ids.length; i++) {
+        if (String(ids[i][0] || '').trim() === vaultKey) {
+          sheet.getRange(i + 2, 1, 1, headers.length).setValues([rowVals]);
+          return '[VAULT_REF:' + vaultKey + ']';
+        }
+      }
+    }
+    sheet.getRange(lastRow + 1, 1, 1, headers.length).setValues([rowVals]);
+    return '[VAULT_REF:' + vaultKey + ']';
+  } catch (ignore) {
+    return fullDataUrl;
+  }
+}
+
+function readSheetFast(ss, sheetName, vaultMap) {
   var sheet = ss.getSheetByName(sheetName);
   if (!sheet) return [];
   var lastRow = sheet.getLastRow();
@@ -581,6 +633,7 @@ function readSheetFast(ss, sheetName) {
   var headers = values[0];
   var schemaHeaders = SHEET_SCHEMAS[sheetName] || [];
   var results = [];
+  var vMap = vaultMap || {};
 
   for (var i = 1; i < values.length; i++) {
     var row = values[i];
@@ -640,6 +693,19 @@ function readSheetFast(ss, sheetName) {
       for (var ck in colObj) {
         if (finalObj[ck] === undefined || finalObj[ck] === '' || finalObj[ck] === null) {
           finalObj[ck] = colObj[ck];
+        }
+      }
+    }
+
+    // Restore any chunked attachments from 44S_Ops_ReceiptVault
+    var attachmentFields = ['receiptProofUrl', 'attachmentUrl', 'attachmentDataUrl', 'receiptDataUrl', 'photoUrl', 'ktpPhotoUrl', 'simPhotoUrl', 'proofImage'];
+    for (var af = 0; af < attachmentFields.length; af++) {
+      var aKey = attachmentFields[af];
+      var aVal = finalObj[aKey];
+      if (typeof aVal === 'string' && aVal.indexOf('[VAULT_REF:') === 0) {
+        var refKey = aVal.replace('[VAULT_REF:', '').replace(']', '').trim();
+        if (vMap[refKey]) {
+          finalObj[aKey] = vMap[refKey];
         }
       }
     }
@@ -718,7 +784,7 @@ function upsertSingleRecord(ss, sheetName, record) {
 
   var headers = SHEET_SCHEMAS[sheetName] || ['id', 'rawJson'];
   var sheet = getOrCreateSheetWithSchema(ss, sheetName, headers);
-  var cleanRec = sanitizeRecordForDatabase(record);
+  var cleanRec = sanitizeRecordForDatabase(record, ss);
   var rowValues = mapRecordToRow(cleanRec, headers);
 
   var lastRow = sheet.getLastRow();
@@ -820,16 +886,30 @@ function deleteRowById(ss, sheetName, idOrPayload) {
   return { deleted: false, id: targetId, reason: 'ID tidak ditemukan' };
 }
 
-function sanitizeRecordForDatabase(record) {
+function sanitizeRecordForDatabase(record, ss) {
   if (!record || typeof record !== 'object') return {};
   var copy = JSON.parse(JSON.stringify(record));
   delete copy._sheetRowIndex;
-  var heavyFields = ['attachmentDataUrl', 'receiptDataUrl', 'receiptProofUrl', 'photoUrl', 'ktpPhotoUrl', 'simPhotoUrl', 'proofImage'];
+  var activeSs = ss || SpreadsheetApp.getActiveSpreadsheet();
+  var heavyFields = ['receiptProofUrl', 'attachmentUrl', 'attachmentDataUrl', 'receiptDataUrl', 'photoUrl', 'ktpPhotoUrl', 'simPhotoUrl', 'proofImage'];
 
+  // 1. Keep compact receipts (<= 38,000 chars / ~26 KB) directly in rawJson (1 cell, hemat penyimpanan).
+  //    If any attachment exceeds 38,000 chars, store it safely in 44S_Ops_ReceiptVault without losing data.
   for (var i = 0; i < heavyFields.length; i++) {
     var key = heavyFields[i];
-    if (typeof copy[key] === 'string' && copy[key].length > 15000) {
-      copy[key] = '[COMPRESSED_ATTACHMENT_REF:' + (copy.attachmentName || key) + ']';
+    if (typeof copy[key] === 'string' && copy[key].length > 38000) {
+      copy[key] = saveToReceiptVault(activeSs, copy.id || 'REC', key, copy[key]);
+    }
+  }
+
+  // 2. If total JSON string still approaches Google Sheets 50,000-char cell limit, offload remaining attachments to vault
+  var serialized = JSON.stringify(copy);
+  if (serialized.length > 46000) {
+    for (var j = 0; j < heavyFields.length; j++) {
+      var hKey = heavyFields[j];
+      if (typeof copy[hKey] === 'string' && copy[hKey].length > 1500 && copy[hKey].indexOf('[VAULT_REF:') !== 0) {
+        copy[hKey] = saveToReceiptVault(activeSs, copy.id || 'REC', hKey, copy[hKey]);
+      }
     }
   }
   return copy;
@@ -839,7 +919,7 @@ function resolveValueForHeader(record, h) {
   if (!record || typeof record !== 'object') return '';
   if (h === 'rawJson') {
     var jsonStr = JSON.stringify(record);
-    return jsonStr.length > 48000 ? jsonStr.substring(0, 48000) : jsonStr;
+    return jsonStr.length > 49500 ? jsonStr.substring(0, 49500) : jsonStr;
   }
   if (h === 'allowedModulesJson' || h === 'Modul Aktif (JSON)') {
     return JSON.stringify(record.allowedTabs || record.allowedModules || []);
@@ -1382,9 +1462,16 @@ function setupDatabase() {
   invalidateFastCache();
   return {
     status: 'success',
-    message: '16 Sheet Database 44S Ops_pro siap digunakan (Data yang ada tetap aman).',
+    message: '27 Sheet Database 44S Ops_pro (termasuk ReceiptVault Hemat Penyimpanan) siap digunakan (Data yang ada tetap aman).',
     health: getDatabaseHealthReport()
   };
+}
+
+/**
+ * Alias kompatibilitas untuk setupCompleteFleetOpsDatabase()
+ */
+function setupCompleteFleetOpsDatabase() {
+  return setupDatabase();
 }
 
 /**

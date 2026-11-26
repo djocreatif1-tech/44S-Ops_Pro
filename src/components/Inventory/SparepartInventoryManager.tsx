@@ -58,6 +58,7 @@ import { TablePagination } from '../Common/TablePagination';
 import { getRolePermissions } from '../../utils/permissions';
 import { RoleRestrictedBanner } from '../Common/RoleRestrictedBanner';
 import { confirmDelete } from '../../utils/dialogService';
+import { resolveDisplayReceiptUrl } from '../../utils/imageCompressor';
 
 interface SparepartInventoryManagerProps {
   inventory: SparepartInventoryItem[];
@@ -2638,9 +2639,12 @@ export const SparepartInventoryManager: React.FC<SparepartInventoryManagerProps>
             </div>
             <div className="p-4 bg-slate-100 flex items-center justify-center max-h-[75vh] overflow-y-auto">
               <img
-                src={inspectedProofUrl.url}
+                src={resolveDisplayReceiptUrl(inspectedProofUrl.url, {
+                  title: 'BUKTI NOTA / FOTO SPAREPART',
+                  subtitle: inspectedProofUrl.title
+                })}
                 alt={inspectedProofUrl.title}
-                className="max-w-full rounded-xl border border-slate-300 shadow-sm"
+                className="max-w-full rounded-xl border border-slate-300 shadow-sm bg-white"
               />
             </div>
           </div>

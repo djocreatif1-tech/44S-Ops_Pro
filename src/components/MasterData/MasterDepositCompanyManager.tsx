@@ -53,6 +53,7 @@ import {
 import { TablePagination } from '../Common/TablePagination';
 import { ReceiptUploadField } from '../Common/ReceiptUploadField';
 import { PrintOutPreviewStage } from '../Common/PrintPreviewControls';
+import { compressReceiptFile } from '../../utils/imageCompressor';
 import { confirmDelete } from '../../utils/dialogService';
 import { SAMPLE_RECEIPT_IMAGE } from '../../data/initialData';
 import { CompanyDepositTrendChart } from './CompanyDepositTrendChart';
@@ -544,14 +545,17 @@ export const MasterDepositCompanyManager: React.FC<MasterDepositCompanyManagerPr
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setTopUpFormData((prev) => ({ ...prev, receiptProofUrl: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressed = await compressReceiptFile(file);
+        setTopUpFormData((prev) => ({ ...prev, receiptProofUrl: compressed }));
+      } catch {
+        // ignore
+      } finally {
+        e.target.value = '';
+      }
     }
   };
 

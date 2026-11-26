@@ -31,6 +31,7 @@ import { PrintOutPreviewStage } from '../Common/PrintPreviewControls';
 import { ModuleAnalyticsPanel } from '../Common/ModuleAnalyticsPanel';
 import { BarChart3, ListFilter } from 'lucide-react';
 import { confirmDelete } from '../../utils/dialogService';
+import { resolveDisplayReceiptUrl } from '../../utils/imageCompressor';
 
 interface MaintenanceManagerProps {
   maintenance: MaintenanceRecord[];
@@ -1252,19 +1253,30 @@ export const MaintenanceManager: React.FC<MaintenanceManagerProps> = ({
               </button>
             </div>
             <div className="p-4 bg-slate-100 flex items-center justify-center min-h-[300px] max-h-[480px] overflow-auto">
-              {inspectedReceiptRecord.receiptProofUrl?.startsWith('data:application/pdf') ? (
-                <iframe
-                  src={inspectedReceiptRecord.receiptProofUrl}
-                  title="Nota Bengkel PDF"
-                  className="w-full h-[420px] rounded-lg border border-slate-200 bg-white"
-                />
-              ) : inspectedReceiptRecord.receiptProofUrl ? (
-                <img
-                  src={inspectedReceiptRecord.receiptProofUrl}
-                  alt="Nota Bengkel"
-                  className="max-w-full max-h-[440px] object-contain rounded-lg shadow-sm"
-                />
-              ) : (
+              {inspectedReceiptRecord.receiptProofUrl ? (() => {
+                const resolvedUrl = resolveDisplayReceiptUrl(inspectedReceiptRecord.receiptProofUrl, {
+                  title: 'NOTA SERVIS & BENGKEL ARMADA',
+                  subtitle: inspectedReceiptRecord.workshopName || inspectedReceiptRecord.serviceType,
+                  receiptNumber: inspectedReceiptRecord.workOrderNumber || inspectedReceiptRecord.id,
+                  date: formatDateIndo(inspectedReceiptRecord.serviceDate),
+                  amountText: formatRupiah(inspectedReceiptRecord.totalCost),
+                  nopol: inspectedReceiptRecord.nopol,
+                  driverName: inspectedReceiptRecord.driverName
+                });
+                return resolvedUrl.startsWith('data:application/pdf') ? (
+                  <iframe
+                    src={resolvedUrl}
+                    title="Nota Bengkel PDF"
+                    className="w-full h-[420px] rounded-lg border border-slate-200 bg-white"
+                  />
+                ) : (
+                  <img
+                    src={resolvedUrl}
+                    alt="Nota Bengkel"
+                    className="max-w-full max-h-[440px] object-contain rounded-lg shadow-sm bg-white"
+                  />
+                );
+              })() : (
                 <div className="text-center text-slate-400 text-xs">
                   <FileText className="w-8 h-8 mx-auto mb-2" />
                   Belum ada nota terlampir.

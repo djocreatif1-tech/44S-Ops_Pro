@@ -54,6 +54,7 @@ import { SAMPLE_RECEIPT_IMAGE } from '../../data/initialData';
 import { ModuleAnalyticsPanel } from '../Common/ModuleAnalyticsPanel';
 import { BarChart3, ListFilter } from 'lucide-react';
 import { confirmDelete } from '../../utils/dialogService';
+import { resolveDisplayReceiptUrl } from '../../utils/imageCompressor';
 
 interface DriverPocketMoneyManagerProps {
   pocketFlows: DriverPocketCashFlow[];
@@ -1862,20 +1863,31 @@ export const DriverPocketMoneyManager: React.FC<DriverPocketMoneyManagerProps> =
             </div>
 
             <div className="p-4 bg-slate-100 flex items-center justify-center min-h-[320px] max-h-[500px] overflow-auto">
-              {inspectedReceipt.receiptProofUrl?.startsWith('data:application/pdf') ? (
-                <iframe
-                  src={inspectedReceipt.receiptProofUrl}
-                  title="Pratinjau Nota PDF"
-                  className="w-full h-[440px] rounded-lg border border-slate-200 bg-white"
-                />
-              ) : (
-                <img
-                  src={inspectedReceipt.receiptProofUrl}
-                  alt="Nota Fisik"
-                  style={{ transform: `scale(${receiptZoom})` }}
-                  className="max-w-full max-h-[460px] object-contain transition-transform duration-150 shadow-md rounded-lg"
-                />
-              )}
+              {(() => {
+                const resolvedUrl = resolveDisplayReceiptUrl(inspectedReceipt.receiptProofUrl, {
+                  title: 'BUKTI PENCAIRAN UANG SAKU DRIVER',
+                  subtitle: `${inspectedReceipt.originLocation} -> ${inspectedReceipt.destinationLocation}`,
+                  receiptNumber: inspectedReceipt.receiptNumber || inspectedReceipt.tripCode || inspectedReceipt.id,
+                  date: formatDateIndo(inspectedReceipt.date),
+                  amountText: formatRupiah(inspectedReceipt.totalAmount),
+                  nopol: inspectedReceipt.nopol,
+                  driverName: inspectedReceipt.driverName
+                });
+                return resolvedUrl.startsWith('data:application/pdf') ? (
+                  <iframe
+                    src={resolvedUrl}
+                    title="Pratinjau Nota PDF"
+                    className="w-full h-[440px] rounded-lg border border-slate-200 bg-white"
+                  />
+                ) : (
+                  <img
+                    src={resolvedUrl}
+                    alt="Nota Fisik"
+                    style={{ transform: `scale(${receiptZoom})` }}
+                    className="max-w-full max-h-[460px] object-contain transition-transform duration-150 shadow-md rounded-lg bg-white"
+                  />
+                );
+              })()}
             </div>
 
             <div className="px-5 py-3 bg-white border-t border-slate-100 flex items-center justify-between gap-2">

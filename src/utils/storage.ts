@@ -29,6 +29,7 @@ import {
   SparepartInventoryItem,
   SparepartStockMovement
 } from '../types';
+import { compressImageDataUrl, isBrokenAttachmentRef } from './imageCompressor';
 
 import {
   INITIAL_VEHICLES,
@@ -562,17 +563,32 @@ export function mergeLocalWithCloudArray<T extends { id: string }>(
     }
   }
 
-  // 2. Add all cloud items, enriched with any non-empty local fields
+  // 2. Add all cloud items, enriched with any non-empty local fields (and heal any stripped receipt URLs)
+  const attachmentKeys = ['receiptProofUrl', 'attachmentUrl', 'photoUrl', 'ktpPhotoUrl', 'simPhotoUrl'];
   for (const cItem of cleanCloud) {
     const cid = String(cItem.id || '').trim();
     if (!cid || addedIds.has(cid)) continue;
     const matchingLocal = localMap.get(cid);
     if (matchingLocal) {
       const combined: Record<string, any> = { ...matchingLocal, ...cItem };
-      // Preserve local fields if cloud returned empty or placeholder '-'
+      let healedReceiptFromLocal = false;
+
+      // Preserve local fields if cloud returned empty, placeholder '-', or a legacy stripped [COMPRESSED_ATTACHMENT_REF:...]
       for (const [k, lVal] of Object.entries(matchingLocal)) {
         const cVal = (cItem as any)[k];
-        if (
+        const isCloudBrokenAttachment =
+          attachmentKeys.includes(k) &&
+          (cVal === undefined || cVal === null || cVal === '' || isBrokenAttachmentRef(String(cVal)));
+        const isLocalValidAttachment =
+          attachmentKeys.includes(k) &&
+          typeof lVal === 'string' &&
+          lVal.length > 20 &&
+          !isBrokenAttachmentRef(lVal);
+
+        if (isCloudBrokenAttachment && isLocalValidAttachment) {
+          combined[k] = lVal;
+          healedReceiptFromLocal = true;
+        } else if (
           (cVal === undefined || cVal === null || cVal === '' || cVal === '-') &&
           lVal !== undefined &&
           lVal !== null &&
@@ -582,7 +598,11 @@ export function mergeLocalWithCloudArray<T extends { id: string }>(
           combined[k] = lVal;
         }
       }
+
       mergedList.push(combined as T);
+      if (healedReceiptFromLocal) {
+        unsyncedLocal.push(combined as T);
+      }
     } else {
       mergedList.push(cItem);
     }
@@ -1173,11 +1193,38 @@ export const fetchAppDataFromGAS = async (
   }
 };
 
+async function compressPayloadImagesDeep(input: any): Promise<any> {
+  if (!input) return input;
+  if (typeof input === 'string') {
+    if (
+      input.startsWith('data:image/') &&
+      !input.startsWith('data:image/svg+xml') &&
+      input.length > 24000
+    ) {
+      return await compressImageDataUrl(input, 24000);
+    }
+    return input;
+  }
+  if (Array.isArray(input)) {
+    return await Promise.all(input.map((item) => compressPayloadImagesDeep(item)));
+  }
+  if (typeof input === 'object') {
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(input)) {
+      out[k] = await compressPayloadImagesDeep(v);
+    }
+    return out;
+  }
+  return input;
+}
+
 export const syncToGoogleAppsScript = async (
   webAppUrl: string,
   action: string,
   data: unknown
 ): Promise<{ success: boolean; message: string }> => {
+  const optimizedData = await compressPayloadImagesDeep(data);
+
   if (isRunningInGAS()) {
     return new Promise((resolve) => {
       try {
@@ -1194,7 +1241,7 @@ export const syncToGoogleAppsScript = async (
               message: 'Gagal menyimpan ke Google Spreadsheet: ' + String(err)
             });
           })
-          .runClientApi({ action, payload: data, data });
+          .runClientApi({ action, payload: optimizedData, data: optimizedData });
       } catch (e) {
         resolve({ success: false, message: String(e) });
       }
@@ -1205,7 +1252,7 @@ export const syncToGoogleAppsScript = async (
     return { success: false, message: 'URL Apps Script belum diisi.' };
   }
 
-  const payloadString = JSON.stringify({ action, payload: data, data });
+  const payloadString = JSON.stringify({ action, payload: optimizedData, data: optimizedData });
 
   try {
     // Standard POST with text/plain (avoids CORS preflight in Apps Script)

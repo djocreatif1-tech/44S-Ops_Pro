@@ -26,7 +26,8 @@ import { TablePagination } from '../Common/TablePagination';
 import { confirmDelete } from '../../utils/dialogService';
 import { ReceiptUploadField } from '../Common/ReceiptUploadField';
 import { ModuleAnalyticsPanel } from '../Common/ModuleAnalyticsPanel';
-import { BarChart3, ListFilter } from 'lucide-react';
+import { BarChart3, ListFilter, UploadCloud } from 'lucide-react';
+import { resolveDisplayReceiptUrl, compressReceiptFile, getApproxBase64SizeKB } from '../../utils/imageCompressor';
 
 interface FuelLogManagerProps {
   fuelLogs: FuelLog[];
@@ -972,62 +973,124 @@ export const FuelLogManager: React.FC<FuelLogManagerProps> = ({
       )}
 
       {/* Modal Preview Struk / Nota BBM */}
-      {inspectedReceiptLog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50">
-              <div className="flex items-center gap-2">
-                <Receipt className="w-4 h-4 text-blue-600" />
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900">
-                    Struk / Nota SPBU: {inspectedReceiptLog.nopol}
-                  </h4>
-                  <p className="text-[10px] text-slate-400">
-                    {formatDateIndo(inspectedReceiptLog.date)} • {inspectedReceiptLog.fuelStation} • {formatRupiah(inspectedReceiptLog.totalCost)}
-                  </p>
+      {inspectedReceiptLog && (() => {
+        const resolvedReceiptUrl = resolveDisplayReceiptUrl(inspectedReceiptLog.receiptProofUrl, {
+          title: 'STRUK / NOTA SPBU BBM',
+          subtitle: inspectedReceiptLog.fuelStation || 'SPBU Pertamina',
+          receiptNumber: inspectedReceiptLog.receiptNumber || inspectedReceiptLog.id,
+          date: formatDateIndo(inspectedReceiptLog.date),
+          amountText: formatRupiah(inspectedReceiptLog.totalCost),
+          nopol: inspectedReceiptLog.nopol,
+          driverName: inspectedReceiptLog.driverName,
+          volumeText: `${inspectedReceiptLog.fuelType} • ${inspectedReceiptLog.volumeLiters} Liter`
+        });
+        const approxKb = getApproxBase64SizeKB(resolvedReceiptUrl);
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50">
+                <div className="flex items-center gap-2">
+                  <Receipt className="w-4 h-4 text-blue-600" />
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900">
+                      Struk / Nota SPBU: {inspectedReceiptLog.nopol}
+                    </h4>
+                    <p className="text-[10px] text-slate-400">
+                      {formatDateIndo(inspectedReceiptLog.date)} • {inspectedReceiptLog.fuelStation} • {formatRupiah(inspectedReceiptLog.totalCost)}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setInspectedReceiptLog(null)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="p-4 bg-slate-100 flex items-center justify-center min-h-[300px] max-h-[480px] overflow-auto">
+                {resolvedReceiptUrl.startsWith('data:application/pdf') ? (
+                  <iframe
+                    src={resolvedReceiptUrl}
+                    title="Nota SPBU PDF"
+                    className="w-full h-[420px] rounded-lg border border-slate-200 bg-white"
+                  />
+                ) : resolvedReceiptUrl ? (
+                  <img
+                    src={resolvedReceiptUrl}
+                    alt="Nota SPBU"
+                    onError={(e) => {
+                      const fallback = resolveDisplayReceiptUrl('[COMPRESSED_ATTACHMENT_REF:receiptProofUrl]', {
+                        title: 'STRUK / NOTA SPBU BBM',
+                        subtitle: inspectedReceiptLog.fuelStation || 'SPBU Pertamina',
+                        receiptNumber: inspectedReceiptLog.receiptNumber || inspectedReceiptLog.id,
+                        date: formatDateIndo(inspectedReceiptLog.date),
+                        amountText: formatRupiah(inspectedReceiptLog.totalCost),
+                        nopol: inspectedReceiptLog.nopol,
+                        driverName: inspectedReceiptLog.driverName,
+                        volumeText: `${inspectedReceiptLog.fuelType} • ${inspectedReceiptLog.volumeLiters} Liter`
+                      });
+                      if (e.currentTarget.src !== fallback) {
+                        e.currentTarget.src = fallback;
+                      }
+                    }}
+                    className="max-w-full max-h-[440px] object-contain rounded-lg shadow-sm bg-white"
+                  />
+                ) : (
+                  <div className="text-center text-slate-400 text-xs">
+                    <FileText className="w-8 h-8 mx-auto mb-2" />
+                    Belum ada nota terlampir.
+                  </div>
+                )}
+              </div>
+              <div className="px-5 py-3 bg-white border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500 font-mono">
+                    No. Struk: {inspectedReceiptLog.receiptNumber || '-'}
+                  </span>
+                  {approxKb > 0 && (
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold">
+                      DB Sync ({approxKb} KB)
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {perms.canEditFuelLog && onUpdateFuelLog && (
+                    <label className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-semibold rounded-lg cursor-pointer inline-flex items-center gap-1.5 transition">
+                      <UploadCloud className="w-3.5 h-3.5" />
+                      <span>Upload / Ganti Foto Nota</span>
+                      <input
+                        type="file"
+                        accept="image/*,application/pdf"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          try {
+                            const compressed = await compressReceiptFile(file);
+                            const updatedLog = { ...inspectedReceiptLog, receiptProofUrl: compressed };
+                            onUpdateFuelLog(updatedLog);
+                            setInspectedReceiptLog(updatedLog);
+                          } catch {
+                            // ignore
+                          }
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  )}
+                  <button
+                    onClick={() => setInspectedReceiptLog(null)}
+                    className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg"
+                  >
+                    Tutup
+                  </button>
                 </div>
               </div>
-              <button
-                onClick={() => setInspectedReceiptLog(null)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="p-4 bg-slate-100 flex items-center justify-center min-h-[300px] max-h-[480px] overflow-auto">
-              {inspectedReceiptLog.receiptProofUrl?.startsWith('data:application/pdf') ? (
-                <iframe
-                  src={inspectedReceiptLog.receiptProofUrl}
-                  title="Nota SPBU PDF"
-                  className="w-full h-[420px] rounded-lg border border-slate-200 bg-white"
-                />
-              ) : inspectedReceiptLog.receiptProofUrl ? (
-                <img
-                  src={inspectedReceiptLog.receiptProofUrl}
-                  alt="Nota SPBU"
-                  className="max-w-full max-h-[440px] object-contain rounded-lg shadow-sm"
-                />
-              ) : (
-                <div className="text-center text-slate-400 text-xs">
-                  <FileText className="w-8 h-8 mx-auto mb-2" />
-                  Belum ada nota terlampir.
-                </div>
-              )}
-            </div>
-            <div className="px-5 py-3 bg-white border-t border-slate-100 flex items-center justify-between text-xs">
-              <span className="text-slate-500 font-mono">
-                No. Struk: {inspectedReceiptLog.receiptNumber || '-'}
-              </span>
-              <button
-                onClick={() => setInspectedReceiptLog(null)}
-                className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg"
-              >
-                Tutup
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

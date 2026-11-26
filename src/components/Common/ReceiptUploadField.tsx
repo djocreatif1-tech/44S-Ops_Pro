@@ -1,7 +1,12 @@
-import React, { useRef } from 'react';
-import { UploadCloud, CheckCircle2, Eye, Trash2, FileText } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { UploadCloud, CheckCircle2, Eye, Trash2, FileText, Loader2 } from 'lucide-react';
 import { SAMPLE_RECEIPT_IMAGE } from '../../data/initialData';
 import { showCenterCrudNotification } from '../../utils/dialogService';
+import {
+  compressReceiptFile,
+  getApproxBase64SizeKB,
+  resolveDisplayReceiptUrl
+} from '../../utils/imageCompressor';
 
 interface ReceiptUploadFieldProps {
   value?: string;
@@ -16,30 +21,38 @@ export const ReceiptUploadField: React.FC<ReceiptUploadFieldProps> = ({
   value = '',
   onChange,
   label = 'Upload Foto Nota / Bukti Pembayaran',
-  helperText = 'Format JPG, PNG, atau PDF (maks. 5 MB)',
+  helperText = 'Format JPG, PNG, WebP, atau PDF (Otomatis dikompresi hemat database)',
   required = false,
   allowSample = true
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [isCompressing, setIsCompressing] = useState(false);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      showCenterCrudNotification('Ukuran file maksimal 5 MB.', 'error');
+    if (file.size > 10 * 1024 * 1024) {
+      showCenterCrudNotification('Ukuran file maksimal 10 MB.', 'error');
       return;
     }
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      if (typeof reader.result === 'string') {
-        onChange(reader.result);
-      }
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
+    setIsCompressing(true);
+    try {
+      const compressedDataUrl = await compressReceiptFile(file);
+      onChange(compressedDataUrl);
+    } catch {
+      showCenterCrudNotification('Gagal memproses file nota.', 'error');
+    } finally {
+      setIsCompressing(false);
+      e.target.value = '';
+    }
   };
 
-  const isPdf = value.startsWith('data:application/pdf');
+  const displayUrl = resolveDisplayReceiptUrl(value, {
+    title: 'BUKTI NOTA / STRUK TERLAMPIR',
+    subtitle: label
+  });
+  const isPdf = displayUrl.startsWith('data:application/pdf');
+  const approxKb = getApproxBase64SizeKB(displayUrl);
 
   return (
     <div className="p-3 bg-slate-50/90 border border-slate-200 rounded-xl space-y-2">
@@ -70,7 +83,12 @@ export const ReceiptUploadField: React.FC<ReceiptUploadFieldProps> = ({
         className="hidden"
       />
 
-      {value ? (
+      {isCompressing ? (
+        <div className="p-3.5 border-2 border-dashed border-blue-300 bg-blue-50/40 rounded-xl text-center flex items-center justify-center gap-2 text-xs text-blue-700 font-semibold">
+          <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+          <span>Mengompresi nota agar hemat penyimpanan database...</span>
+        </div>
+      ) : value ? (
         <div className="flex items-center gap-3 p-2.5 bg-white border border-emerald-300 rounded-xl">
           {isPdf ? (
             <div className="w-12 h-12 rounded-lg bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0">
@@ -78,7 +96,7 @@ export const ReceiptUploadField: React.FC<ReceiptUploadFieldProps> = ({
             </div>
           ) : (
             <img
-              src={value}
+              src={displayUrl}
               alt="Pratinjau Nota"
               className="w-12 h-12 object-cover rounded-lg border border-slate-200 shrink-0"
             />
@@ -89,10 +107,12 @@ export const ReceiptUploadField: React.FC<ReceiptUploadFieldProps> = ({
               <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
               <span className="truncate">Nota / Bukti Transaksi Terlampir</span>
             </p>
-            <p className="text-[10px] text-slate-400">Tersimpan dan siap diaudit tim keuangan.</p>
+            <p className="text-[10px] text-slate-400">
+              Tersimpan di database ({approxKb} KB • Hemat Penyimpanan) &amp; siap diaudit.
+            </p>
             <div className="mt-1 flex items-center gap-2.5">
               <a
-                href={value}
+                href={displayUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="text-[10px] text-slate-600 hover:text-blue-600 font-semibold inline-flex items-center gap-0.5"
